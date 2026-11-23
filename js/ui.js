@@ -1,248 +1,249 @@
-// Interface: telas, HUD, painéis, tutorial, cinemáticas, salvar
+// Interface: telas, HUD, toque no mapa, ataque, resultado, missões, painéis
 'use strict';
-(function(){
-const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
-const SAVE='guerras_mundiais_save_v1';const VEL=[0,1.5,5,14];
-let S=null,vel=1,rodando=false,pausadoUI=false,selExe=null,selProv=null,painelAtual=null,tutAtivo=false,lidas=0;
-const P=SIM.P;
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const SAVE='guerras_mundiais_v2';const VEL=[0,3,9];
+let S=null,vel=1,demo=true,sel=null,modo=null,painelAtual=null,animando=false,lidas=0,atqEst=null;
+const P=SIM.P;const TK=['i','b','a'];const TI={i:'inf',b:'tan',a:'avi'};
 const fmt=n=>{n=Math.floor(n);return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e4?(n/1e3).toFixed(n>=1e5?0:1)+'k':String(n)};
-const band=(id,e)=>{const n=S&&S.nac[id];return `<span class="band">${ART.bandeira(id,e==null?(n?n.era:0):e,n?n.cor:'#888')}</span>`};
+const band=id=>{const n=S&&S.nac[id];return `<span class="band">${ART.bandeira(id,n?Math.min(3,n.era):0,n?n.cor:'#888')}</span>`};
 const icone=(k,s)=>ART.icone(k,s);
-const custoHTML=(c,n)=>`<div class="custo">${Object.entries(c).map(([k,v])=>`<span class="${n&&n.res[k]<v?'falta':''}">${icone(k,12)}${fmt(v)}</span>`).join('')}</div>`;
-function toast(txt,tipo='info',ms=3800){const t=document.createElement('div');t.className='toast '+tipo;t.innerHTML=txt;$('#toasts').prepend(t);const ts=$$('#toasts .toast');if(ts.length>2)ts.slice(2).forEach(x=>x.remove());setTimeout(()=>{t.style.transition='opacity .4s';t.style.opacity=0;setTimeout(()=>t.remove(),400)},ms)}
-window.__toast=toast;
-// ícones da nav
-$$('#nav i').forEach(i=>i.innerHTML=ART.icone(i.dataset.ic,22));
-// ---------- fundo do menu inicial
-ART.carregar();const cv=$('#mapa');MAPA.init(cv);
-let demo=true,demoPan=true;S=SIM.novo('BRA');S.jog='__demo';S.nac.__demo={id:'__demo',era:0,cor:'#888',res:{},pf:{}};SIM.calcVisao();S.visivel=new Uint8Array(SIM.NP).fill(1);MAPA.sujar();
-MAPA.olhar(2200,560,Math.max(MAPA.zMin()*2.6,.45));
-let ultimo=performance.now(),acHUD=0,acSheet=0,acSave=0,acFog=0;
+const eraDe=id=>{const n=S.nac[id];return n?Math.min(3,n.era):0};
+const imgT=(k,e)=>`img/${TI[k]}${e}.webp`;
+const nomeT=(k,e)=>SIM.TIPOS[k].n[e];
+const espera=ms=>new Promise(r=>setTimeout(r,ms));
+const topo=t=>t.a*3.5>=t.b*3&&t.a*3.5>t.i&&t.a>0?'a':t.b*3>t.i&&t.b>0?'b':'i';
+// ---------- avisos (no máximo 1 na tela)
+const fila=[];let toastAtivo=false;
+function toast(txt,tipo='info'){if(fila.length>=3)fila.shift();fila.push({txt,tipo});if(!toastAtivo)proxToast()}
+function proxToast(){const t=fila.shift();if(!t){toastAtivo=false;return}toastAtivo=true;const el=document.createElement('div');el.className='toast '+t.tipo;el.innerHTML=t.txt;$('#toasts').append(el);setTimeout(()=>{el.classList.add('sai');setTimeout(()=>{el.remove();proxToast()},300)},2600)}
+// ---------- laço
+const cv=$('#mapa');MAPA.init(cv);
+S=SIM.novo('BRA');S.jog='__demo';MAPA.sujar();MAPA.olhar(2050,560,1.25);
+let ultimo=performance.now(),acHUD=0,acSave=0,acMis=0;
+const pausado=()=>animando||!$('#atq').classList.contains('oculto')||!$('#res').classList.contains('oculto')||!$('#modal').classList.contains('oculto')||!$('#cine').classList.contains('oculto')||painelAtual!=null;
 function loop(t){const dt=Math.min(.1,(t-ultimo)/1000);ultimo=t;
- if(demo){if(demoPan)MAPA.cam.x+=dt*8/MAPA.cam.z}
- else if(rodando&&!pausadoUI&&vel>0&&!S.fim){const antes=S.dia;SIM.passo(dt*VEL[vel]);if(S.mudouDono){S.mudouDono=false;MAPA.sujar()}acFog+=dt;if(Math.floor(S.dia/3)!==Math.floor(antes/3))MAPA.sujarFog()}
+ if(demo){const c=MAPA.cam;c.x+=dt*6/c.z;if(c.x>3200)c.x=1500}
+ else if(vel&&!pausado())SIM.passo(VEL[vel]*dt);
  MAPA.desenhar(dt);
- if(!demo){acHUD+=dt;if(acHUD>.25){acHUD=0;hud()}acSheet+=dt;if(acSheet>.8){acSheet=0;atualizarSheet()}acSave+=dt;if(acSave>25){acSave=0;salvar()}}
+ if(!demo){acHUD+=dt;if(acHUD>.25){acHUD=0;hud();if(!pausado())proximaProposta()}acMis+=dt;if(acMis>.5){acMis=0;missoes()}acSave+=dt;if(acSave>20){acSave=0;salvar()}}
  requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
-$('.versao').textContent='Mapa real com '+SIM.NP+' províncias · '+Object.keys(S.nac).length+' nações em 1914';
+MAPA.carregarImgs();
 // ---------- início
+$('.versao').textContent='Mapa real com '+SIM.NP+' cidades · 4 eras · v2';
 if(localStorage.getItem(SAVE))$('#btContinuar').classList.remove('oculto');
-$('#btNovo').onclick=()=>abrirEscolha();
-$('#btContinuar').onclick=()=>{try{const o=JSON.parse(localStorage.getItem(SAVE));SIM.carregar(o);S=SIM.get();iniciarJogo(false)}catch(e){console.error(e);toast('Não foi possível carregar o jogo salvo.','guerra')}};
-$('#btComo').onclick=()=>comoJogar();
-function comoJogar(){modal(`<h3>Como jogar</h3>
-<p><b>🎯 Objetivo:</b> comece em 1914 e leve seu país por todas as guerras — 1ª Guerra, 2ª Guerra, Guerra Fria e Guerra Moderna — até 2030. Conquiste, sobreviva e fique no topo do ranking.</p>
-<p><b>🗺️ Mapa:</b> arraste para mover, use dois dedos (ou a rodinha) para dar zoom.</p>
-<p><b>🪖 Exércitos:</b> toque num exército seu e depois toque no destino. Se entrar em território inimigo, ele luta e conquista a província.</p>
-<p><b>🏭 Províncias:</b> toque numa província sua para construir (quartel, fábrica, porto, aeródromo, ferrovia, fortificação) e recrutar tropas.</p>
-<p><b>🔬 Pesquisa:</b> libera aviões, submarinos, tanques melhores e permite pular para a próxima era antes do calendário.</p>
-<p><b>🤝 Diplomacia:</b> alianças, paz, comércio, visão compartilhada ou guerra. Cuidado: tem país traiçoeiro!</p>
-<p><b>⏩ Tempo:</b> use ❚❚ ▶ ▶▶ ▶▶▶ no topo. As eras mudam com o calendário (1939, 1947, 1991) ou antes, pela pesquisa.</p>
-<div class="acoes" style="grid-template-columns:1fr"><button class="prim" data-fechar>Entendi</button></div>`)}
-// ---------- escolha de nação
+$('#btNovo').onclick=abrirEscolha;$('#btComo').onclick=()=>comoJogar();
+$('#btContinuar').onclick=()=>{try{if(SIM.carregar(localStorage.getItem(SAVE))){S=SIM.get();iniciarJogo(false)}else toast('Save antigo incompatível. Comece uma nova campanha.')}catch(e){toast('Não deu para carregar o save.')}};
+function comoJogar(depois){modal(`<h3>Como jogar</h3><div class="passos">
+ <div><i>🗺️</i><p><b>Cada cidade mostra suas tropas.</b> O número no círculo é o tamanho do exército.</p></div>
+ <div><i>⚔️</i><p><b>Ataque vizinhos:</b> toque numa cidade sua e depois numa cidade <span class="vermelho">vermelha</span>. Compare as forças e toque em ATACAR.</p></div>
+ <div><i>🎖️</i><p><b>Reforços todo mês.</b> Coloque nas cidades de fronteira. Mova tropas tocando numa cidade <span class="verde">verde</span>.</p></div>
+ <div><i>🕰️</i><p><b>Avance de era:</b> 1914 → 2ª Guerra → Guerra Fria → Guerra Moderna. Suas tropas evoluem sozinhas.</p></div></div>
+ <div class="acoes"><button class="bt bt-ouro" data-fechar>Entendi!</button></div>`,depois)}
 const MAIORES=['DEU','GBR','FRA','RUS','AUT','TUR','ITA','USA','JPN','BRA','CHN','ESP','SRB','ARG','PRT','NLD','MEX','SWE','IRN','ETH'];
-const DESAFIO={DEU:3,GBR:2,FRA:2,RUS:2,AUT:4,TUR:4,ITA:3,USA:1,JPN:2,BRA:1,CHN:3,ESP:2,SRB:5,ARG:1,PRT:3,NLD:3,MEX:2,SWE:1,IRN:3,ETH:4};
-let escolhido=null,dific=1,mostrarTodos=false;
-function abrirEscolha(){$('#inicio').classList.add('oculto');const el=$('#escolha');el.classList.remove('oculto');renderEscolha()}
-function renderEscolha(){const el=$('#escolha');const cont={};S.prov.forEach(p=>cont[p.d]=(cont[p.d]||0)+1);
- const ids=mostrarTodos?Object.keys(S.nac).filter(i=>i!=='__demo'&&cont[i]).sort((a,b)=>SIM.nomeNac(a).localeCompare(SIM.nomeNac(b))):MAIORES.filter(i=>S.nac[i]);
- const exs=id=>S.exs.filter(a=>a.dono===id).reduce((s,a)=>s+a.units.length,0);
- el.innerHTML=`<div class="esc-top"><h2>ESCOLHA SUA NAÇÃO</h2><p>28 de julho de 1914. O mundo está prestes a explodir.</p></div>
- <div class="esc-lista"><div class="abas"><button class="${!mostrarTodos?'on':''}" data-t="0">Grandes nações</button><button class="${mostrarTodos?'on':''}" data-t="1">Todos os países (${Object.keys(cont).length})</button></div>
- <div class="cards">${ids.map(id=>{const n=S.nac[id];const d=DESAFIO[id]||3;return `<button class="ncard ${escolhido===id?'on':''}" data-n="${id}">${band(id,0)}<b>${SIM.nomeNac(id)}</b><small>${cont[id]||0} províncias · ${exs(id)} tropas</small><small>IA: ${PERSONAS[n.persona].n}</small><span class="estrelas">${'★'.repeat(d)}${'☆'.repeat(5-d)}</span></button>`}).join('')}</div></div>
- <div class="esc-rodape"><div class="dific">${['Fácil','Normal','Difícil'].map((t,i)=>`<button class="${dific===i?'on':''}" data-d="${i}">${t}</button>`).join('')}</div>
- <div class="acoes" style="grid-template-columns:1fr 2fr;margin:0"><button data-voltar>Voltar</button><button class="prim" data-comecar ${escolhido?'':'disabled'}>${escolhido?'Começar com '+SIM.nomeNac(escolhido):'Toque numa nação'}</button></div></div>`;
- el.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{escolhido=b.dataset.n;const c=P[S.nac[escolhido].cap];MAPA.voar(c.x,c.y+60/Math.max(.6,MAPA.cam.z),Math.max(.9,MAPA.cam.z),.9);MAPA.selProv=S.nac[escolhido].cap;demoPan=false;renderEscolha()});
- el.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{mostrarTodos=b.dataset.t==='1';renderEscolha()});
- el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{dific=+b.dataset.d;renderEscolha()});
- el.querySelector('[data-voltar]').onclick=()=>{el.classList.add('oculto');$('#inicio').classList.remove('oculto');demoPan=true;MAPA.selProv=null};
- el.querySelector('[data-comecar]').onclick=()=>{if(!escolhido)return;SIM.novo(escolhido);S=SIM.get();S.dific=dific;MAPA.selProv=null;iniciarJogo(true)}}
-// ---------- iniciar
-function iniciarJogo(novo){demo=false;S=SIM.get();$('#inicio').classList.add('oculto');$('#escolha').classList.add('oculto');['#hud','#nav','#botoesMapa'].forEach(s=>$(s).classList.remove('oculto'));
- MAPA.sujar();SIM.calcVisao();const c=P[S.nac[S.jog].cap];MAPA.olhar(c.x,c.y,P[S.nac[S.jog].cap].cont==='Europe'?2.4:1.4);hud();rodando=true;setVel(novo?0:1);lidas=S.news.length;
- if(novo){cinematica(0,()=>{if(!localStorage.getItem('guerras_tut_ok'))tutorial();else setVel(1)})}salvar()}
-// ---------- HUD
+const DESAFIO={DEU:3,GBR:2,FRA:3,RUS:3,AUT:4,TUR:4,ITA:3,USA:1,JPN:2,BRA:1,CHN:3,ESP:2,SRB:5,ARG:1,PRT:3,NLD:3,MEX:2,SWE:1,IRN:3,ETH:4};
+let escolhido='BRA',todos=false;
+function abrirEscolha(){$('#inicio').classList.add('oculto');$('#escolha').classList.remove('oculto');renderEscolha()}
+function renderEscolha(){const cont={},tr={};S.prov.forEach(p=>{cont[p.d]=(cont[p.d]||0)+1;tr[p.d]=(tr[p.d]||0)+p.i+p.b+p.a});
+ const ids=(todos?Object.keys(S.nac).filter(id=>id!=='__demo'&&cont[id]).sort((a,b)=>SIM.nomeNac(a).localeCompare(SIM.nomeNac(b),'pt')):MAIORES.filter(id=>S.nac[id]));
+ $('#escolha').innerHTML=`<div class="esc-top"><h2>ESCOLHA SEU PAÍS</h2><p>28 de julho de 1914. O mundo está prestes a explodir.</p></div>
+ <div class="abas"><button class="${!todos?'on':''}" data-t="0">Grandes nações</button><button class="${todos?'on':''}" data-t="1">Todos (${Object.keys(cont).length})</button></div>
+ <div class="esc-lista"><div class="cards">${ids.map(id=>{const d=DESAFIO[id]||3;return `<button class="ncard ${id===escolhido?'on':''}" data-n="${id}">${band(id)}<b>${SIM.nomeNac(id)}</b><small>${cont[id]} cidades · ${tr[id]} tropas</small><span class="estrelas">${'★'.repeat(6-d)}${'☆'.repeat(d-1)}</span><small class="fac">${d<=2?'Fácil':d<=3?'Médio':'Difícil'}</small></button>`}).join('')}</div></div>
+ <div class="esc-rodape"><button class="bt" id="escVoltar">Voltar</button><button class="bt bt-ouro" data-comecar>Jogar com ${SIM.nomeNac(escolhido)}</button></div>`;
+ $$('#escolha [data-n]').forEach(b=>b.onclick=()=>{escolhido=b.dataset.n;const id=escolhido;const p=P[S.nac[id].cap];MAPA.voar(p.x,p.y,1.8);renderEscolha()});
+ $$('#escolha [data-t]').forEach(b=>b.onclick=()=>{todos=b.dataset.t==='1';renderEscolha()});
+ $('#escVoltar').onclick=()=>{$('#escolha').classList.add('oculto');$('#inicio').classList.remove('oculto')};
+ $('[data-comecar]').onclick=()=>{S=SIM.novo(escolhido);iniciarJogo(true)}}
+function iniciarJogo(novo){demo=false;S=SIM.get();$('#inicio').classList.add('oculto');$('#escolha').classList.add('oculto');['#hud','#nav','#botoesMapa','#missao'].forEach(s=>$(s).classList.remove('oculto'));
+ MAPA.sujar();const c=P[S.nac[S.jog].cap];const eur=c.cont==='Europe';MAPA.olhar(c.x,c.y+40,eur?2.6:1.8);setVel(1);lidas=S.news.length;hud();
+ if(novo){S.mis=0;S.misIni={};cinematica(0,()=>comoJogar(()=>{missoes(true)}))}else missoes(true)}
 function setVel(v){vel=v;$$('#vel button').forEach(b=>b.classList.toggle('on',+b.dataset.v===v))}
 $$('#vel button').forEach(b=>b.onclick=()=>setVel(+b.dataset.v));
-$('#zMais').onclick=()=>MAPA.zoom(1.6);$('#zMenos').onclick=()=>MAPA.zoom(1/1.6);
-$('#zCasa').onclick=()=>{const c=P[S.nac[S.jog].cap];MAPA.voar(c.x,c.y,Math.max(1.1,MAPA.cam.z))};
-$('#hudNac').onclick=()=>abrirPainel('diplo');
-function hud(){const n=S.nac[S.jog];if(!n)return;const e=Math.min(3,n.era);document.documentElement.style.setProperty('--ac',TEMAS[e].acento);document.documentElement.style.setProperty('--ac2',['#f3d98a','#e4d9a2','#a8ecff','#a6ffe6'][e]);
- $('#hudBand').innerHTML=ART.bandeira(S.jog,e,n.cor);$('#hudNome').textContent=SIM.nomeNac(S.jog);$('#hudEra').textContent=ERAS[e].curto+(e>S.eraMundo?' ★':'');
- $('#hudData').textContent=SIM.dataTxt(S.dia);const prox=SIM.DIA_ERA[S.eraMundo+1];$('#hudAno').textContent=prox?`${ERAS[S.eraMundo+1].curto} em ${Math.max(0,SIM.ano(prox)-SIM.ano(S.dia))} anos`:'até 2030';
- const g=n.ganho||{};const m=n.manut||{};
- $('#recursos').innerHTML=RECURSOS.map(([k])=>{const liq=(g[k]||0)-(m[k]||0);return `<div class="rc">${icone(k,16)}<b>${fmt(n.res[k])}</b><small class="${liq<0?'neg':''}">${liq>=0?'+':''}${Math.round(liq)}</small></div>`}).join('');
- const np=S.prop.length;$('#bDiplo').textContent=np;$('#bDiplo').classList.toggle('oculto',!np);const nn=S.news.length-lidas;$('#bNews').textContent=nn>99?'99+':nn;$('#bNews').classList.toggle('oculto',nn<=0||painelAtual==='noticias');
- if(painelAtual&&painelAtual!=='noticias'&&painelAtual!=='menu'&&Math.random()<.25)renderPainel(true)}
-// ---------- callbacks da simulação
-SIM.onNoticia=n=>{if(demo)return;toast(n.txt,n.tipo)};
-SIM.onEra=e=>{if(demo)return;MAPA.sujar();cinematica(e)};
-SIM.onConquista=(p,novo,velho)=>{if(demo)return;const n=S.nac[novo];MAPA.onda(P[p].x,P[p].y,MAPA.corEra(n.cor,3));if(novo===S.jog){toast(`🚩 Conquistamos <b>${P[p].n}</b>!`,'paz',2500)}};
-SIM.onAtaque=(node,dono,dmg)=>{const x=SIM.nx(node),y=SIM.ny(node);if(S.visivel&&(node>=SIM.NP||S.visivel[node]))for(let i=0;i<4;i++)setTimeout(()=>MAPA.explosao(x+(Math.random()-.5)*14,y+(Math.random()-.5)*10,2),i*120)};
-SIM.onLancar=m=>{if(demo)return;const vis=m.dono===S.jog||(m.alvo<SIM.NP&&S.visivel[m.alvo])||(m.de<SIM.NP&&S.visivel[m.de]);if(vis)MAPA.missil(SIM.nx(m.de),SIM.ny(m.de),SIM.nx(m.alvo),SIM.ny(m.alvo),m.dur/VEL[Math.max(1,vel)]);if(m.alvo<SIM.NP&&S.prov[m.alvo].d===S.jog)toast('🚀 Míssil inimigo a caminho de '+P[m.alvo].n+'!','guerra')};
-SIM.onMissil=m=>{const x=SIM.nx(m.alvo),y=SIM.ny(m.alvo);MAPA.explosao(x,y,4);setTimeout(()=>MAPA.explosao(x+5,y-3,3),150);MAPA.onda(x,y,'#ffb347')};
-SIM.onGuerra=(a,b)=>{if(demo)return;if(a===S.jog||b===S.jog){const o=a===S.jog?b:a;toast(`⚔️ GUERRA contra <b>${SIM.nomeNac(o)}</b>!`,'guerra',5000)}};
-SIM.onDerrota=()=>{rodando=false;modal(`<h3>Derrota</h3><p>${SIM.nomeNac(S.jog)} foi completamente conquistado(a) em ${SIM.dataTxt(S.dia)}.</p><p>A história continua sem você… quer tentar de novo?</p><div class="acoes" style="grid-template-columns:1fr"><button class="prim" onclick="localStorage.removeItem('${SAVE}');location.reload()">Nova campanha</button></div>`)};
-SIM.onFim=()=>{setVel(0);modal(`<h3>2030 — Fim da campanha</h3><p>Você atravessou todas as guerras do século!</p>${rankingHTML()}<div class="acoes" style="grid-template-columns:1fr 1fr"><button data-fechar>Continuar jogando</button><button class="prim" onclick="localStorage.removeItem('${SAVE}');location.reload()">Nova campanha</button></div>`)};
-// ---------- toque no mapa
-const meus=ids=>ids.map(i=>S.exs.find(a=>a.id===i)).filter(Boolean);
-MAPA.onTapExe=(ids,sx,sy)=>{if(demo)return;const l=meus(ids);if(!l.length)return;
- if(MAPA.cam.z<.9&&l.length>1){const a=l[0];MAPA.voar(a.x,a.y,1.3,.5);return}
- const a=l[0];const sel=selExe&&S.exs.find(x=>x.id===selExe);
- if(sel&&sel.dono===S.jog&&a.dono!==S.jog){ordenar(sel,a.node);return}
- if(a.dono===S.jog&&sel&&sel.id===a.id){desselecionar();return}
- selecionarExe(a.id)};
-MAPA.onTapProv=p=>{if(demo){return}const sel=selExe&&S.exs.find(x=>x.id===selExe);if(sel&&sel.dono===S.jog){ordenar(sel,p);return}abrirProv(p)};
-MAPA.onTapMar=(node)=>{if(demo)return;const sel=selExe&&S.exs.find(x=>x.id===selExe);if(sel&&sel.dono===S.jog&&node>=0&&!SIM.ehAereo(sel)){ordenar(sel,node);return}fecharSheet()};
-function ordenar(a,node){if(a.units.every(u=>u.t==='mis')){if(node>=SIM.NP){toast('Escolha uma província como alvo.');return}const r=SIM.lancarMissil(a,node);if(r==='ok'){toast('🚀 Míssil lançado contra '+P[node].n+'!','guerra');if(!S.exs.includes(a))desselecionar()}else toast(r==='fora'?'Alvo fora do alcance do míssil.':'Sem mísseis.');return}
- if(SIM.ehAereo(a)){if(node>=SIM.NP){toast('Escolha uma província.');return}const pr=S.prov[node];if(pr.d===S.jog||SIM.aliado(pr.d,S.jog)){const r=SIM.reposicionar(a,node);toast(r==='ok'?'✈️ Esquadrão voando para '+P[node].n:r==='base'?'Precisa de um Aeródromo lá.':'Muito longe para este avião.');return}
-  const temIni=S.exs.some(b=>b.node===node&&SIM.emGuerra(b.dono,S.jog));if(!SIM.emGuerra(pr.d,S.jog)&&!temIni){toast('Você não está em guerra com '+SIM.nomeNac(pr.d)+'.');return}
-  const r=SIM.ataqueAereo(a,node);toast(r==='ok'?'💥 Ataque aéreo a caminho de '+P[node].n+'!':'Alvo fora do alcance ('+Math.round(SIM.alcance(a))+' km).',r==='ok'?'guerra':'info');return}
- if(node<SIM.NP){const o=S.prov[node].d;if(o!==S.jog&&!SIM.aliado(o,S.jog)&&!SIM.emGuerra(o,S.jog)){modal(`<h3>Território neutro</h3><p>${P[node].n} pertence a <b>${SIM.nomeNac(o)}</b>. Para entrar, você precisa declarar guerra.</p><div class="acoes" style="grid-template-columns:1fr 1fr"><button data-fechar>Cancelar</button><button class="perigo" id="mGuerra">Declarar guerra</button></div>`);$('#mGuerra').onclick=()=>{SIM.propor('guerra',o);fecharModal();MAPA.sujar();ordenar(a,node)};return}}
- const p=SIM.mover(a,node);if(!p){toast('Não há caminho até lá.');return}if(!p.length)return;const d=SIM.tempoCaminho(a,p);MAPA.preview={node};setTimeout(()=>{if(MAPA.preview&&MAPA.preview.node===node)MAPA.preview=null},1500);
- toast(`🪖 Marchando para <b>${SIM.nomeNo(node)}</b> · ${Math.max(1,Math.round(d))} dia(s)${p.some(n=>n>=SIM.NP)&&!SIM.ehNaval(a)?' (por mar)':''}`,'info',2200);atualizarSheet(true)}
-function selecionarExe(id){selExe=id;MAPA.sel=id;selProv=null;MAPA.selProv=null;const a=S.exs.find(x=>x.id===id);if(!a)return;abrirExe();const [,sy]=MAPA.W2S(a.x,a.y);if(sy>innerHeight*.5||sy<110){const z=MAPA.cam.z;MAPA.voar(a.x,a.y+(innerHeight*.5-innerHeight*.33)/z,z,.45)}if(a.dono===S.jog){const aer=SIM.ehAereo(a),mis=a.units.every(u=>u.t==='mis');dica(mis?'🎯 Toque no alvo do míssil':aer?'🎯 Toque no alvo do ataque aéreo':'👉 Toque no destino no mapa')}}
-function desselecionar(){selExe=null;MAPA.sel=null;dica(null);fecharSheet()}
-function dica(t){const d=$('#dica');if(!t){d.classList.add('oculto');return}d.textContent=t;d.classList.remove('oculto');posDica()}
-function posDica(){const d=$('#dica'),sh=$('#sheet');if(d.classList.contains('oculto'))return;const r=sh.classList.contains('oculto')?null:sh.getBoundingClientRect();d.style.bottom=r?(innerHeight-r.top+8)+'px':''}
-setInterval(posDica,300);
-// ---------- folha: província
-function abrirProv(p){selProv=p;selExe=null;MAPA.sel=null;MAPA.selProv=p;dica(null);fecharPainel();const sh=$('#sheet');sh.classList.remove('oculto','compacta');sh.dataset.t='prov';renderProv();sh.scrollTop=0}
-function abrirExe(){fecharPainel();const sh=$('#sheet');sh.classList.remove('oculto');sh.classList.add('compacta');sh.dataset.t='exe';renderExe();sh.scrollTop=0}
-function fecharSheet(){$('#sheet').classList.add('oculto');selProv=null;MAPA.selProv=null;if(!selExe){MAPA.sel=null;dica(null)}}
-function atualizarSheet(forca){const sh=$('#sheet');if(sh.classList.contains('oculto'))return;if(document.activeElement&&sh.contains(document.activeElement)&&!forca){}
- const st=sh.scrollTop;const rs=[...sh.querySelectorAll('.recr')].map(r=>r.scrollLeft);if(sh.dataset.t==='prov')renderProv();else renderExe();sh.scrollTop=st;sh.querySelectorAll('.recr').forEach((r,i)=>r.scrollLeft=rs[i]||0)}
-function statusRel(o){if(o===S.jog)return '<span class="chip meu">Sua</span>';if(SIM.emGuerra(o,S.jog))return '<span class="chip guerra">Em guerra</span>';if(SIM.aliado(o,S.jog))return '<span class="chip ali">Aliada</span>';return '<span class="chip">Neutra</span>'}
-function renderProv(){const p=selProv;if(p==null)return;const pr=S.prov[p];const pp=P[p];const o=pr.d;const n=S.nac[o];const meu=o===S.jog;const vis=S.visivel[p];const e=Math.min(3,S.nac[S.jog].era);
- const prod=SIM.producao(p);const nucleo=SIM.nucleo(o,p);
- let h=`<div class="cab">${band(o)}<div><h3>${pp.n}${n.cap===p?' ★':''}</h3><div class="sub">${SIM.nomeNac(o)}${nucleo?'':' · território ocupado'}</div></div><button class="x" data-fechar-sheet>✕</button></div>
- <div class="chips">${statusRel(o)}<span class="chip">${TERRENOS[pp.ter].n}</span><span class="chip">👥 ${fmt(pp.pop*1000)}</span>${pp.costa?'<span class="chip">⚓ Litoral</span>':''}${pr.cerco>0?`<span class="chip guerra">Cerco ${Math.round(pr.cerco/SIM.precCerco(p)*100)}%</span>`:''}</div>
- <div style="display:flex;align-items:center;gap:8px;font-size:12px"><span style="width:54px;color:var(--mut)">Moral</span><div class="barra" style="flex:1"><i style="width:${pr.m}%;${pr.m<35?'background:#ff4d4d':''}"></i></div><b>${Math.round(pr.m)}%</b></div>
- <div class="sec">Produção por dia</div><div class="chips">${Object.entries(prod).map(([k,v])=>`<span class="chip">${icone(k,14)} +${v.toFixed(1)}</span>`).join('')}</div>`;
- if(meu){h+=`<div class="sec">Construções</div><div class="grade">${Object.keys(PREDIOS).map(k=>{const D=PREDIOS[k];const lv=pr.b[k];const naFila=pr.f.find(f=>f.t==='b'&&f.k===k);const c=SIM.custoPredio(p,k);const max=lv>=D.max;const porto=k==='por'&&!pp.costa;
-   return `<div class="pred"><b>${D.n}</b><div class="nv">${lv}<small style="font-size:11px;color:var(--mut)">/${D.max}</small></div>${max?'<small style="color:var(--grn)">Máximo</small>':porto?'<small>Sem litoral</small>':naFila?`<div class="barra" style="margin-top:8px"><i style="width:${(1-naFila.rest/naFila.tot)*100}%"></i></div><small>${Math.ceil(naFila.rest)} dias</small>`:`${custoHTML(c,S.nac[S.jog])}<button data-cons="${k}" ${SIM.pode(S.nac[S.jog],c)?'':'disabled'}>Construir</button>`}</div>`}).join('')}</div>`;
-  h+=`<div class="sec">Recrutar tropas</div><div class="recr">${ORDEM_UNID.map(t=>{const U=UNIDADES[t];const r=SIM.podeRecrutar(p,t);if(r.e===undefined&&r.motivo==='Pesquise primeiro'){const e0=Math.max(U.era0,0);if(!U.nomes[Math.max(e0,Math.min(3,S.nac[S.jog].era))])return '';}
-   const eu=r.e!=null&&r.e>=0?r.e:Math.max(U.era0,Math.min(3,S.nac[S.jog].era));if(!U.nomes[eu])return '';const c=r.c||SIM.custo(U.custo,eu);
-   return `<div class="uc"><div class="art">${ART.svg(t,eu)}</div><b>${U.nomes[eu]}</b><div class="st">${Math.round(U.dias*(1+eu*.15))} dias</div>${custoHTML(c,S.nac[S.jog])}<button data-rec="${t}" ${r.ok?'':'disabled'}>${r.ok?'Recrutar':r.motivo}</button></div>`}).join('')}</div>`;
-  if(pr.f.length)h+=`<div class="sec">Fila de produção</div>${pr.f.map((f,i)=>`<div class="fila">${f.t==='u'?`<span style="width:40px;height:26px;display:inline-block">${ART.svg(f.u,f.e)}</span>${UNIDADES[f.u].nomes[f.e]}`:'🏗️ '+PREDIOS[f.k].n}<div class="barra"><i style="width:${i===0?(1-f.rest/f.tot)*100:0}%"></i></div><small>${Math.ceil(f.rest)}d</small><button class="x" data-canc="${i}">✕</button></div>`).join('')}`}
- else if(vis){const ex=S.exs.filter(a=>a.node===p&&SIM.exeVisivel(a));h+=`<div class="sec">Tropas vistas aqui</div>${ex.length?ex.map(linhaExe).join(''):'<p style="color:var(--mut);font-size:12px">Nenhuma tropa visível.</p>'}`;
-  h+=`<div class="sec">Construções</div><div class="chips">${Object.keys(PREDIOS).filter(k=>pr.b[k]).map(k=>`<span class="chip">${PREDIOS[k].n} ${pr.b[k]}</span>`).join('')||'<small style="color:var(--mut)">Nenhuma</small>'}</div>`}
- else h+=`<p style="color:var(--mut);font-size:12px;margin-top:10px">🌫️ Região fora da sua visão. Envie tropas para perto ou faça "visão compartilhada" na diplomacia.</p>`;
- if(!meu)h+=`<div class="acoes" style="grid-template-columns:1fr"><button data-diplo="${o}">Diplomacia com ${SIM.nomeNac(o)}</button></div>`;
- const aqui=S.exs.filter(a=>a.node===p&&a.dono===S.jog);if(meu&&aqui.length)h+=`<div class="sec">Seus exércitos aqui</div>${aqui.map(linhaExe).join('')}`;
- $('#sheetC').innerHTML=h;ligarSheet()}
-function grupos(a){const g={};for(const u of a.units){const k=u.t+u.e;(g[k]=g[k]||{t:u.t,e:u.e,n:0,hp:0,hpm:0}).n++;g[k].hp+=u.hp;g[k].hpm+=SIM.hpMax(u)}return Object.values(g)}
-function nomeExe(a){const t=grupos(a).sort((x,y)=>y.n-x.n)[0];if(!t)return 'Exército';const U=UNIDADES[t.t];return SIM.ehNaval(a)?'Frota':SIM.ehAereo(a)?'Esquadrilha':a.units.every(u=>u.t==='mis')?'Bateria de mísseis':'Exército'}
-function statusExe(a){if(a.missao)return a.missao.tipo==='ataque'?'✈️ Em missão de ataque':'✈️ Voando';if(S.batalhas.has(a.node))return '⚔️ Em combate';if(a.path.length){const d=SIM.tempoCaminho(a,a.path)*(1-0);return `➡️ Indo para ${SIM.nomeNo(a.path[a.path.length-1])} · ${Math.max(1,Math.round(d))}d`}const pr=a.node<SIM.NP?S.prov[a.node]:null;if(pr&&pr.cd===a.dono&&pr.cerco>0)return '🚩 Conquistando…';return '⏸ Parado em '+SIM.nomeNo(a.node)}
-function linhaExe(a){const t=grupos(a).sort((x,y)=>y.n-x.n)[0];return `<button class="linha" data-exe="${a.id}"><span class="art">${ART.svg(t.t,t.e)}</span><span class="meio"><b>${nomeExe(a)} · ${a.units.length} unid.</b><small>${a.dono===S.jog?statusExe(a):SIM.nomeNac(a.dono)}</small></span><span class="dir">${Math.round(SIM.forca(a))}<br><small style="color:var(--mut);font-weight:600">força</small></span></button>`}
-function renderExe(){const a=S.exs.find(x=>x.id===selExe);if(!a){desselecionar();return}const meu=a.dono===S.jog;const gs=grupos(a);const top=gs.sort((x,y)=>y.n-x.n)[0];
- let h=`<div class="cab"><span style="width:64px;height:40px;flex:none">${ART.svg(top.t,top.e)}</span><div><h3>${nomeExe(a)} · ${a.units.length}</h3><div class="sub">${band(a.dono).replace('class="band"','class="band" style="width:20px;height:13px;vertical-align:-2px"')} ${SIM.nomeNac(a.dono)} · força ${Math.round(SIM.forca(a))}</div></div><button class="x" data-desel>✕</button></div>
- <div class="chips"><span class="chip ${S.batalhas.has(a.node)?'guerra':''}">${meu?statusExe(a):SIM.nomeNo(a.node)}</span>${SIM.ehAereo(a)?`<span class="chip">Alcance ${Math.round(SIM.alcance(a))} km</span>`:''}</div>
- ${gs.map(g=>`<div class="linha" style="padding:5px 8px"><span class="art">${ART.svg(g.t,g.e)}</span><span class="meio"><b>${UNIDADES[g.t].nomes[g.e]} ×${g.n}</b><div class="barra" style="margin-top:4px"><i style="width:${g.hp/g.hpm*100}%;background:${g.hp/g.hpm>.6?'#5be37a':g.hp/g.hpm>.3?'#ffc93c':'#ff4d4d'}"></i></div></span><span class="dir" style="font-size:11px;color:var(--mut)">${ERAS[g.e].curto}</span></div>`).join('')}`;
- if(meu){const outros=S.exs.filter(b=>b!==a&&b.dono===S.jog&&b.node===a.node&&!b.missao&&SIM.ehAereo(b)===SIM.ehAereo(a));const mod=SIM.custoModernizar(a);const temMod=Object.keys(mod).length>0;
-  h+=`<div class="acoes"><button data-a="parar" ${a.path.length?'':'disabled'}>Parar</button><button data-a="dividir" ${a.units.length>1?'':'disabled'}>Dividir</button><button data-a="juntar" ${outros.length?'':'disabled'}>Juntar (${outros.length})</button></div>`;
-  if(temMod)h+=`<div class="acoes" style="grid-template-columns:1fr"><button class="prim" data-a="modernizar">Modernizar tropas antigas ${custoHTML(mod,S.nac[S.jog]).replace('class="custo"','class="custo" style="color:#1a1206"')}</button></div>`;
-  const prs=a.node<SIM.NP?S.exs.filter(b=>b.node===a.node&&b.dono===S.jog&&b!==a):[];if(prs.length)h+=`<div class="sec">Outros aqui</div>${prs.map(linhaExe).join('')}`}
- $('#sheetC').innerHTML=h;ligarSheet()}
-function ligarSheet(){const c=$('#sheetC');
- c.querySelectorAll('[data-fechar-sheet]').forEach(b=>b.onclick=fecharSheet);c.querySelectorAll('[data-desel]').forEach(b=>b.onclick=desselecionar);
- c.querySelectorAll('[data-cons]').forEach(b=>b.onclick=()=>{const r=SIM.construir(selProv,b.dataset.cons);if(r!=='ok')toast(r==='rec'?'Recursos insuficientes.':r==='fila'?'Já está em construção.':'Nível máximo.');renderProv()});
- c.querySelectorAll('[data-rec]').forEach(b=>b.onclick=()=>{const r=SIM.recrutar(selProv,b.dataset.rec);if(r!=='ok')toast(r);else toast('Recrutamento iniciado: '+UNIDADES[b.dataset.rec].nomes[SIM.eraUnid(S.jog,b.dataset.rec)],'info',1500);atualizarSheet(true)});
- c.querySelectorAll('[data-canc]').forEach(b=>b.onclick=()=>{SIM.cancelarFila(selProv,+b.dataset.canc);renderProv()});
- c.querySelectorAll('[data-exe]').forEach(b=>b.onclick=()=>{const a=S.exs.find(x=>x.id===+b.dataset.exe);if(!a)return;if(a.dono===S.jog)selecionarExe(a.id);else{selExe=a.id;MAPA.sel=a.id;abrirExe()}});
- c.querySelectorAll('[data-diplo]').forEach(b=>b.onclick=()=>detalheNac(b.dataset.diplo));
- c.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=S.exs.find(x=>x.id===selExe);if(!a)return;const k=b.dataset.a;
-  if(k==='parar'){a.path=[];a.alvo=null;a.prog=0;a.x=SIM.nx(a.node);a.y=SIM.ny(a.node)}
-  if(k==='dividir'){const metade=a.units.splice(Math.ceil(a.units.length/2));const nv=SIM.novoExe(a.dono,a.node,metade);toast('Exército dividido em dois.','info',1500)}
-  if(k==='juntar'){for(const o of S.exs.filter(x=>x!==a&&x.dono===S.jog&&x.node===a.node&&!x.missao&&SIM.ehAereo(x)===SIM.ehAereo(a))){a.units.push(...o.units);o.units=[]}S.exs=S.exs.filter(x=>x.units.length);toast('Exércitos unidos.','info',1500)}
-  if(k==='modernizar'){const r=SIM.modernizar(a);toast(r==='ok'?'Tropas modernizadas!':r,r==='ok'?'paz':'info')}
-  renderExe()})}
+$('#zMais').onclick=()=>MAPA.zoom(1.5);$('#zMenos').onclick=()=>MAPA.zoom(1/1.5);
+$('#zCasa').onclick=()=>{const c=P[S.nac[S.jog].cap];MAPA.voar(c.x,c.y,Math.max(2,MAPA.cam.z))};
+$('#hudNac').onclick=()=>abrirPainel('menu');
+$$('#nav [data-ic]').forEach(i=>i.innerHTML=icone(i.dataset.ic,22));
+// ---------- HUD
+function hud(){const n=S.nac[S.jog];if(!n)return;const e=Math.min(3,S.eraMundo);document.documentElement.style.setProperty('--ac',TEMAS[e].acento);
+ $('#hudBand').innerHTML=ART.bandeira(S.jog,eraDe(S.jog),n.cor);$('#hudNome').textContent=SIM.nomeNac(S.jog);$('#hudEra').textContent=ERAS[e].curto;
+ $('#hudData').textContent=SIM.dataTxt(S.dia);const prox=e<3?ERAS[e+1]:null;$('#hudAno').textContent=prox?`${ERAS[e+1].curto} em ${Math.max(0,prox.ano-SIM.ano(S.dia))} anos`:'Rumo a 2030';
+ const r=SIM.rendaDia(S.jog);$('#rcDin').innerHTML=`${icone('dinheiro',16)}<b>${fmt(n.din)}</b><small class="${r.din<0?'neg':''}">${r.din>=0?'+':''}${r.din.toFixed(0)}/dia</small>`;
+ $('#rcPet').innerHTML=`${icone('petroleo',16)}<b>${fmt(n.pet)}</b><small>+${r.pet.toFixed(1)}</small>`;
+ const br=$('#btRef');if(n.ref>0){br.classList.remove('oculto');br.innerHTML=`🎖️ <b>${n.ref}</b> reforços`;br.classList.toggle('on',modo==='reforco')}else br.classList.add('oculto');
+ const np=S.prop.length;const bd=$('#bDiplo');bd.classList.toggle('oculto',!np);bd.textContent=np;
+ const nn=S.news.length-lidas;const bn=$('#bNews');bn.classList.toggle('oculto',nn<=0||painelAtual==='noticias');bn.textContent=nn>99?'99+':nn;
+ if(painelAtual==='noticias')lidas=S.news.length}
+$('#btRef').onclick=()=>{if(modo==='reforco'){sairModo();return}desselecionar();modo='reforco';const n=S.nac[S.jog];MAPA.moveis=SIM.cidadesDe(S.jog).filter(p=>SIM.viz(p).some(q=>S.prov[q].d!==S.jog));if(!MAPA.moveis.length)MAPA.moveis=[n.cap];dica(`Toque numa cidade sua para colocar ${n.ref} reforços (as verdes são de fronteira).`);hud()};
+function sairModo(){modo=null;MAPA.moveis=null;dica(null);hud()}
+// ---------- seleção
+MAPA.onTapProv=p=>{if(demo||animando)return;const meu=S.prov[p].d===S.jog;
+ if(modo==='reforco'){if(!meu){toast('Escolha uma cidade <b>sua</b>.');return}const r=SIM.colocarReforcos(p);if(r){MAPA.texto(P[p].x,P[p].y,'+'+r,'#7dff9a');MAPA.onda(P[p].x,P[p].y,'#7dff9a')}sairModo();selecionar(p);return}
+ if(sel!=null&&p!==sel){if(MAPA.alvos&&MAPA.alvos.includes(p)){abrirAtaque(p,[sel]);return}if(MAPA.moveis&&MAPA.moveis.includes(p)){abrirMover(sel,p);return}}
+ if(meu){selecionar(p);return}
+ const dono=S.prov[p].d;const fontes=SIM.fontesPara(p);if(fontes.length&&!SIM.aliado(dono,S.jog)){fontes.sort((a,b)=>SIM.forcaCidade(b)-SIM.forcaCidade(a));abrirAtaque(p,[fontes[0]]);return}
+ abrirInfo(p)};
+MAPA.onTapMar=()=>{if(modo==='reforco')return;desselecionar()};
+function selecionar(p){sel=p;MAPA.selProv=p;const vz=SIM.viz(p);MAPA.alvos=vz.filter(q=>S.prov[q].d!==S.jog&&!SIM.aliado(S.prov[q].d,S.jog));MAPA.moveis=vz.filter(q=>S.prov[q].d===S.jog);abrirSheet('meu');focar(p)}
+function desselecionar(){sel=null;MAPA.selProv=null;MAPA.alvos=null;if(modo!=='reforco')MAPA.moveis=null;fecharSheet()}
+function focar(p){const [sx,sy]=MAPA.W2S(P[p].x,P[p].y);if(sy>innerHeight*.42||sy<130||sx<30||sx>innerWidth-30){const z=MAPA.cam.z;MAPA.voar(P[p].x,P[p].y+(innerHeight*.5-innerHeight*.3)/z,z,.5)}}
+function dica(t){const d=$('#dica');if(!t){d.classList.add('oculto');return}d.innerHTML=t;d.classList.remove('oculto')}
+// ---------- folha da cidade
+let sheetTipo=null,sheetP=null;
+function abrirSheet(t,p=sel){sheetTipo=t;sheetP=p;const sh=$('#sheet');sh.classList.remove('oculto');renderSheet();dica(null)}
+function fecharSheet(){$('#sheet').classList.add('oculto');sheetTipo=null;sheetP=null}
+function abrirInfo(p){sel=null;MAPA.selProv=p;MAPA.alvos=null;MAPA.moveis=null;abrirSheet('info',p);focar(p)}
+function terrenoTxt(p){const t=P[p].ter;const b=SIM.TER_DEF[t];return TERRENOS[t].n+(b>1?` (+${Math.round((b-1)*100)}% defesa)`:'')}
+function tropasHTML(pr,e,rec){return `<div class="tropas3">${TK.map(k=>{const c=SIM.custoTropa(k);return `<div class="tc ${pr[k]?'':'zero'}"><img src="${imgT(k,e)}" alt=""><b>${pr[k]}</b><small>${SIM.TIPOS[k].cat}</small>${rec?`<div class="rbts"><button data-rec="${k}" data-q="1">+1 <span>${icone('dinheiro',11)}${c.din}${c.pet?` ${icone('petroleo',11)}${c.pet}`:''}</span></button><button data-rec="${k}" data-q="5">+5</button></div>`:''}</div>`}).join('')}</div>`}
+function renderSheet(){const p=sheetP;if(p==null)return;const pr=S.prov[p];const d=pr.d;const n=S.nac[d];const meu=d===S.jog;const e=eraDe(d);const cap=n&&n.cap===p;const c=$('#sheetC');
+ const st=meu?'<span class="chip meu">Sua cidade</span>':SIM.emGuerra(d,S.jog)?'<span class="chip guerra">Em guerra</span>':SIM.aliado(d,S.jog)?'<span class="chip ali">Aliado</span>':'<span class="chip">Em paz</span>';
+ let h=`<div class="cab">${band(d)}<div class="cab-t"><h3>${P[p].n}${cap?' <span class="estrela">★</span>':''}</h3><div class="sub">${SIM.nomeNac(d)} ${st}</div></div><button class="x" data-fechar aria-label="Fechar">✕</button></div>`;
+ h+=tropasHTML(pr,e,meu);
+ h+=`<div class="forca-l"><span>🛡️ Defesa <b>${fmt(SIM.defesa(p))}</b></span><span>${terrenoTxt(p)}</span>${pr.fort?`<span>Fortaleza +${pr.fort*40}%</span>`:''}${cap?'<span>Capital +20%</span>':''}</div>`;
+ if(meu){const nr=S.nac[S.jog].ref;if(nr>0)h+=`<button class="bt bt-ouro grande" data-colocar>🎖️ Colocar ${nr} reforços aqui</button>`;
+  h+=`<p class="ajuda">Toque numa cidade <b class="vermelho">vermelha</b> para atacar ou <b class="verde">verde</b> para mover tropas.</p>`;
+  h+=`<div class="sec">Construções</div><div class="preds">${Object.entries(SIM.PREDIOS).map(([k,B])=>{const lv=pr[k];const cu=B.c(lv);return `<div class="pd"><div class="pd-ic">${k==='fab'?'🏭':'🏰'}</div><div class="pd-t"><b>${B.n} <small>${lv}/${B.max}</small></b><small>${B.d}</small></div>${lv<B.max?`<button class="bt mini" data-cons="${k}">${icone('dinheiro',12)} ${cu.din}</button>`:'<span class="max">Máximo</span>'}</div>`}).join('')}</div>`}
+ else{const fontes=SIM.fontesPara(p);const ali=SIM.aliado(d,S.jog);
+  if(!ali&&fontes.length)h+=`<button class="bt bt-atk grande" data-atq>⚔️ Atacar ${P[p].n}</button>`;else if(!ali)h+=`<p class="ajuda">Você não faz fronteira com esta cidade. Conquiste as cidades do caminho para chegar aqui.</p>`;
+  h+=`<div class="sec">${SIM.nomeNac(d)}</div><div class="dip-bts">${diploBts(d)}</div>`}
+ c.innerHTML=h;
+ c.querySelector('[data-fechar]').onclick=desselecionar;
+ $$('#sheetC [data-rec]').forEach(b=>b.onclick=()=>{const r=SIM.recrutar(p,b.dataset.rec,+b.dataset.q);if(r==='ok'){MAPA.texto(P[p].x,P[p].y,'+'+b.dataset.q,'#7dff9a');renderSheet();hud()}else toast(r)});
+ $$('#sheetC [data-cons]').forEach(b=>b.onclick=()=>{const r=SIM.construir(p,b.dataset.cons);if(r==='ok'){toast(`${SIM.PREDIOS[b.dataset.cons].n} construída em ${P[p].n}!`,'ok');renderSheet();hud()}else toast(r)});
+ const bc=c.querySelector('[data-colocar]');if(bc)bc.onclick=()=>{const r=SIM.colocarReforcos(p);if(r){MAPA.texto(P[p].x,P[p].y,'+'+r,'#7dff9a');MAPA.onda(P[p].x,P[p].y,'#7dff9a')}renderSheet();hud()};
+ const ba=c.querySelector('[data-atq]');if(ba)ba.onclick=()=>{const f=SIM.fontesPara(p).sort((a,b)=>SIM.forcaCidade(b)-SIM.forcaCidade(a));abrirAtaque(p,[f[0]])};
+ ligarDiplo(c)}
+// ---------- painel de ataque
+function abrirAtaque(alvo,fontes){atqEst={modo:'atq',alvo,fontes:new Set(fontes),frac:1};fecharSheet();$('#atq').classList.remove('oculto');dica(null);renderAtq()}
+function abrirMover(de,para){atqEst={modo:'mov',de,para,frac:1};fecharSheet();$('#atq').classList.remove('oculto');renderAtq()}
+function fecharAtq(){$('#atq').classList.add('oculto');atqEst=null}
+function miniTropas(t,e){return `<div class="mini3">${TK.filter(k=>t[k]).map(k=>`<span><img src="${imgT(k,e)}" alt="">${t[k]}</span>`).join('')||'<span class="vazio">sem tropas</span>'}</div>`}
+function renderAtq(){const A=atqEst;const c=$('#atqC');const eu=S.jog;const e=eraDe(eu);
+ if(A.modo==='mov'){const t=SIM.separar(A.de,A.frac);const tot=t.i+t.b+t.a;
+  c.innerHTML=`<div class="atq-top mov" style="background-image:linear-gradient(180deg,rgba(0,0,0,.2),rgba(8,12,10,.95)),url(img/era${S.eraMundo}.webp)"><small>MOVER TROPAS</small><h2>${P[A.de].n} → ${P[A.para].n}</h2></div>
+  <div class="duelo"><div class="lado"><img class="grande" src="${imgT(topo(t),e)}" alt="">${miniTropas(t,e)}<small>vão para ${P[A.para].n}</small></div></div>
+  <div class="seg">${[[.5,'Metade'],[1,'Quase todas']].map(([f,l])=>`<button class="${A.frac===f?'on':''}" data-frac="${f}">${l}</button>`).join('')}</div>
+  <p class="ajuda">Fica pelo menos 1 tropa guardando ${P[A.de].n}.</p>
+  <div class="acoes"><button class="bt" data-cancelar>Cancelar</button><button class="bt bt-mov" data-ir ${tot?'':'disabled'}>➜ MOVER ${tot}</button></div>`}
+ else{const alvo=A.alvo;const dono=S.prov[alvo].d;const fontesTodas=SIM.fontesPara(alvo);for(const f of [...A.fontes])if(!fontesTodas.includes(f))A.fontes.delete(f);
+  const pr=SIM.prepararAtaque([...A.fontes],alvo,A.frac);const ch=Math.round(pr.chance*100);const guerra=SIM.emGuerra(dono,eu);const tp=S.prov[alvo];const ed=eraDe(dono);
+  const bon=[];const tb=SIM.TER_DEF[P[alvo].ter];if(tb>1)bon.push(`${TERRENOS[P[alvo].ter].n} +${Math.round((tb-1)*100)}%`);if(tp.fort)bon.push(`Fortaleza +${tp.fort*40}%`);if(SIM.ehCapital(alvo))bon.push('Capital +20%');if(S.eraMundo===0)bon.push('Trincheiras +45%');
+  const cor=ch>=70?'#5be37a':ch>=45?'#ffc93c':'#ff5a4a';
+  c.innerHTML=`<div class="atq-top" style="background-image:linear-gradient(180deg,rgba(0,0,0,.15),rgba(12,8,6,.96)),url(img/era${S.eraMundo}.webp)"><small>ATACAR</small><h2>${P[alvo].n}</h2><div class="dono">${band(dono)} ${SIM.nomeNac(dono)}</div></div>
+  ${guerra?'':`<div class="aviso">⚠️ Atacar vai declarar guerra ${SIM.aNac(dono)}${SIM.aliadosDe(dono).length?` e seus aliados podem entrar na guerra`:''}.</div>`}
+  <div class="duelo"><div class="lado meu"><img class="grande" src="${imgT(topo(pr.t),e)}" alt="">${miniTropas(pr.t,e)}<b class="forca">${fmt(pr.A)}</b><small>Seu ataque</small></div>
+   <div class="vs">VS</div>
+   <div class="lado ini"><img class="grande flip" src="${imgT(topo(tp),ed)}" alt="">${miniTropas(tp,ed)}<b class="forca">${fmt(pr.D)}</b><small>Defesa</small></div></div>
+  ${bon.length?`<div class="bonus">Defesa: ${bon.join(' · ')}</div>`:''}${pr.mar?'<div class="bonus mar">🌊 Ataque pelo mar: −40% de força</div>':''}
+  <div class="chance"><div class="barra"><i style="width:${ch}%;background:${cor}"></i></div><b style="color:${cor}">Chance de vitória: ${ch}%</b></div>
+  <div class="fontes"><small>Atacar a partir de (toque para somar):</small><div>${fontesTodas.map(f=>`<button class="chip ${A.fontes.has(f)?'on':''}" data-f="${f}">${P[f].n} · ${SIM.total(S.prov[f])}</button>`).join('')}</div></div>
+  <div class="seg">${[[.5,'Metade das tropas'],[1,'Quase todas']].map(([f,l])=>`<button class="${A.frac===f?'on':''}" data-frac="${f}">${l}</button>`).join('')}</div>
+  <div class="acoes"><button class="bt" data-cancelar>Cancelar</button><button class="bt bt-atk" data-ir ${pr.fontes.length?'':'disabled'}>⚔️ ATACAR</button></div>`;
+  $$('#atqC [data-f]').forEach(b=>b.onclick=()=>{const f=+b.dataset.f;if(A.fontes.has(f)){if(A.fontes.size>1)A.fontes.delete(f)}else A.fontes.add(f);renderAtq()})}
+ $$('#atqC [data-frac]').forEach(b=>b.onclick=()=>{A.frac=+b.dataset.frac;renderAtq()});
+ c.querySelector('[data-cancelar]').onclick=()=>{const de=A.modo==='mov'?A.de:sel;fecharAtq();if(de!=null&&S.prov[de].d===S.jog)selecionar(de);else desselecionar()};
+ c.querySelector('[data-ir]').onclick=()=>A.modo==='mov'?mover():atacar()}
+async function mover(){const A=atqEst;fecharAtq();const t=SIM.mover(A.de,A.para,A.frac);if(!t)return;const e=eraDe(S.jog);MAPA.marcha(P[A.de].x,P[A.de].y,P[A.para].x,P[A.para].y,topo(t),e,.9);animando=true;MAPA.alvos=null;MAPA.moveis=null;await espera(900);animando=false;MAPA.texto(P[A.para].x,P[A.para].y,'+'+(t.i+t.b+t.a),'#7dff9a');selecionar(A.para)}
+async function atacar(){const A=atqEst;const pr=SIM.prepararAtaque([...A.fontes],A.alvo,A.frac);if(!pr.fontes.length)return;fecharAtq();desselecionar();animando=true;
+ const alvo=A.alvo;const e=eraDe(S.jog);const tp=topo(pr.t);const ax=P[alvo].x,ay=P[alvo].y;let mx=ax,my=ay,dm=0;for(const f of pr.fontes){mx+=P[f.p].x;my+=P[f.p].y;dm=Math.max(dm,Math.hypot(P[f.p].x-ax,P[f.p].y-ay))}mx/=pr.fontes.length+1;my/=pr.fontes.length+1;
+ const z=Math.max(1.2,Math.min(4.5,innerWidth*.55/Math.max(20,dm)));MAPA.voar(mx,my+60/z,z,.6);await espera(650);
+ for(const f of pr.fontes){const k=topo(f.t);MAPA.marcha(P[f.p].x,P[f.p].y,ax,ay,k,e,1.5);if(f.t.a&&k!=='a')MAPA.marcha(P[f.p].x,P[f.p].y,ax,ay,'a',e,1.3)}
+ await espera(1350);for(let i=0;i<7;i++){setTimeout(()=>{MAPA.explosao(ax+(Math.random()-.5)*16/MAPA.cam.z*2,ay+(Math.random()-.5)*12/MAPA.cam.z*2,Math.random()<.4?2:1)},i*150)}MAPA.tremer(.9);
+ await espera(1200);if(!(S.mis>0)&&pr.alvo===MAPA.missao&&pr.chance>.5)pr.garantido=true;const r=SIM.executarAtaque(pr);MAPA.sujar();animando=false;if(r){if(r.vit)MAPA.onda(ax,ay,'#ffd34d');resultado(r)}}
+function resultado(r){const e=eraDe(S.jog);const pa=r.pa.i+r.pa.b+r.pa.a,pd=r.pd.i+r.pd.b+r.pd.a;const el=$('#res');el.classList.remove('oculto');
+ const perdas=(t,ed)=>TK.filter(k=>t[k]).map(k=>`<span><img src="${imgT(k,ed)}" alt="">−${t[k]}</span>`).join('')||'<span>nenhuma</span>';
+ el.innerHTML=`<div class="res-c ${r.vit?'vit':'der'}" style="background-image:linear-gradient(180deg,rgba(0,0,0,.25),rgba(8,8,8,.92) 55%),url(img/era${S.eraMundo}.webp)">
+  <div class="res-banner">${r.vit?'VITÓRIA!':'DERROTA'}</div>
+  <h2>${r.vit?`${P[r.alvo].n} conquistada!`:`O ataque a ${P[r.alvo].n} falhou`}</h2>
+  <img class="res-img ${r.vit?'':'cinza'}" src="${imgT(topo(r.env),e)}" alt="">
+  <div class="res-tab"><div><small>Suas perdas</small><b>−${pa}</b><div class="mini3">${perdas(r.pa,e)}</div></div><div><small>Perdas ${SIM.deNac(r.dono)}</small><b>−${pd}</b><div class="mini3">${perdas(r.pd,eraDe(r.dono))}</div></div></div>
+  <p class="ajuda">${r.vit?`Suas tropas agora ocupam ${P[r.alvo].n} (${SIM.total(S.prov[r.alvo])}). Cuidado com o contra-ataque!`:'Os sobreviventes voltaram. Junte mais tropas ou ataque de várias cidades ao mesmo tempo.'}</p>
+  <button class="bt bt-ouro grande" data-ok>Continuar</button></div>`;
+ el.querySelector('[data-ok]').onclick=()=>{el.classList.add('oculto');if(r.vit&&S.prov[r.alvo].d===S.jog)selecionar(r.alvo);else if(r.de[0]!=null&&S.prov[r.de[0]].d===S.jog)selecionar(r.de[0])}}
+// ---------- diplomacia
+function diploBts(d){if(d===S.jog||!S.nac[d])return '';const g=SIM.emGuerra(d,S.jog),a=SIM.aliado(d,S.jog);
+ return g?`<button class="bt" data-dip="paz" data-n="${d}">🕊️ Propor paz</button>`:a?`<button class="bt" data-dip="romper" data-n="${d}">Romper aliança</button>`:`<button class="bt" data-dip="alianca" data-n="${d}">🤝 Propor aliança</button><button class="bt perigo" data-dip="guerra" data-n="${d}">⚔️ Declarar guerra</button>`}
+function ligarDiplo(root){root.querySelectorAll('[data-dip]').forEach(b=>b.onclick=()=>{const t=b.dataset.dip,d=b.dataset.n;if(t==='guerra'){modal(`<h3>Declarar guerra?</h3><p>Você vai entrar em guerra contra ${SIM.oNac(d)}${SIM.aliadosDe(d).length?' e os aliados podem ajudar o inimigo':''}.</p><div class="acoes"><button class="bt" data-fechar>Cancelar</button><button class="bt perigo" id="mSim">Declarar guerra</button></div>`);$('#mSim').onclick=()=>{fecharModal();const r=SIM.propor('guerra',d);toast(r.txt,'guerra');MAPA.sujar();atualizar()};return}
+ const r=SIM.propor(t,d);toast(r.txt,r.ok?'ok':'info');MAPA.sujar();atualizar()})}
+function atualizar(){if(sheetTipo)renderSheet();if(painelAtual)renderPainel();hud()}
+let propAberta=null;
+function proximaProposta(){if(propAberta||!S.prop.length||animando||(S.mis||0)<1)return;const pr=S.prop[0];if(!S.nac[pr.de]||!S.nac[pr.de].vivo){S.prop.shift();return}propAberta=pr;
+ const tit={paz:'Proposta de paz',ali:'Proposta de aliança',hist:'Momento histórico',ajuda:'Pedido de ajuda'}[pr.tipo]||'Diplomacia';
+ modal(`<div class="prop-cab">${band(pr.de)}<h3>${tit}</h3></div><p>${pr.txt}</p><div class="acoes"><button class="bt" id="pNao">${pr.tipo==='hist'?'Não, seguir em paz':'Recusar'}</button><button class="bt bt-ouro" id="pSim">${pr.tipo==='hist'?'Seguir a história':'Aceitar'}</button></div>`);
+ $('#pSim').onclick=()=>{SIM.responder(pr,true);propAberta=null;fecharModal();MAPA.sujar();atualizar()};$('#pNao').onclick=()=>{SIM.responder(pr,false);propAberta=null;fecharModal();atualizar()}}
 // ---------- painéis
-$$('#nav button').forEach(b=>b.onclick=()=>{const p=b.dataset.p;if(p==='mapa'){fecharPainel();return}if(painelAtual===p){fecharPainel();return}abrirPainel(p)});
-$('#painelX').onclick=()=>fecharPainel();
-function abrirPainel(p){painelAtual=p;$('#sheet').classList.add('oculto');dica(null);$$('#nav button').forEach(b=>b.classList.toggle('ativo',b.dataset.p===p));$('#painel').classList.remove('oculto');$('#painelC').scrollTop=0;if(p==='noticias')lidas=S.news.length;renderPainel()}
-function fecharPainel(){painelAtual=null;$('#painel').classList.add('oculto');$$('#nav button').forEach(b=>b.classList.toggle('ativo',b.dataset.p==='mapa'));if(selExe){const a=S.exs.find(x=>x.id===selExe);if(a&&a.dono===S.jog)dica(SIM.ehAereo(a)?'🎯 Toque no alvo do ataque aéreo':'👉 Toque no destino no mapa')}}
-let abaEra=null;
-function renderPainel(auto){const c=$('#painelC');const st=c.scrollTop;const p=painelAtual;const T={exercitos:'Seus exércitos',pesquisa:'Pesquisa',diplo:'Diplomacia',noticias:'Notícias do mundo',menu:'Menu'};$('#painelT').textContent=T[p];
- if(p==='exercitos'){const l=S.exs.filter(a=>a.dono===S.jog);const tot=l.reduce((s,a)=>s+a.units.length,0);c.innerHTML=`<div class="chips"><span class="chip meu">${l.length} grupos</span><span class="chip">${tot} unidades</span><span class="chip">Força ${Math.round(l.reduce((s,a)=>s+SIM.forca(a),0))}</span></div>`+(l.length?l.sort((a,b)=>SIM.forca(b)-SIM.forca(a)).map(linhaExe).join(''):'<p>Você não tem tropas. Recrute num quartel!</p>');
-  c.querySelectorAll('[data-exe]').forEach(b=>b.onclick=()=>{const a=S.exs.find(x=>x.id===+b.dataset.exe);if(!a)return;fecharPainel();MAPA.voar(a.x,a.y,Math.max(1.4,MAPA.cam.z));selecionarExe(a.id)})}
- if(p==='pesquisa'){const n=S.nac[S.jog];if(abaEra==null)abaEra=Math.min(3,n.era);
-  c.innerHTML=`<div class="labs">${[0,1].map(i=>{const f=n.fila[i];if(!f)return `<div class="lab"><small>LABORATÓRIO ${i+1}</small><span style="color:var(--mut)">Livre — escolha uma pesquisa</span></div>`;const pz=PESQUISAS.find(q=>q.id===f.id);return `<div class="lab"><small>LABORATÓRIO ${i+1}</small><b>${pz.nome}</b><div class="barra" style="margin:5px 0 2px"><i style="width:${(1-f.rest/f.tot)*100}%"></i></div><small style="letter-spacing:0">${Math.ceil(f.rest)} dias</small></div>`}).join('')}</div>
-  <div class="abas">${ERAS.map((e,i)=>`<button class="${abaEra===i?'on':''} ${i>n.era?'trava':''}" data-era="${i}">${i>n.era?'🔒 ':''}${e.curto}</button>`).join('')}</div>
-  ${abaEra>n.era?`<p style="color:var(--mut);font-size:12.5px">🔒 Esta era abre em ${SIM.ano(SIM.DIA_ERA[abaEra])} pelo calendário, ou antes se você pesquisar “Rumo à ${ERAS[abaEra].nome}”.</p>`:''}
-  <div class="tecs">${PESQUISAS.filter(q=>q.era===abaEra).map(q=>{const feita=n.pf[q.id];const and=n.fila.find(f=>f.id===q.id);const disp=SIM.pesqDisponivel(S.jog,q);const c2=SIM.custoPesq(q);
-   const vis=q.tipo==='unid'?`<div class="art">${ART.svg(q.u,Math.max(q.era,UNIDADES[q.u].era0))}</div>`:`<div class="sym">${{eco:'🏭',dou:'🎖️',log:'🚂',era:'⏩'}[q.tipo]}</div>`;
-   return `<button class="tec ${feita?'feita':''} ${and?'andando':''} ${!disp&&!feita&&!and?'bloq':''} ${q.tipo==='era'?'era':''}" data-pz="${q.id}">${vis}<b>${q.nome}</b><small>${q.desc}</small>${feita?'<small style="color:var(--grn)">Concluída</small>':and?`<small style="color:var(--ac2)">Pesquisando… ${Math.ceil(and.rest)}d</small>`:`${custoHTML(c2,n)}<small>⏱ ${q.dias} dias</small>`}</button>`}).join('')}</div>`;
-  c.querySelectorAll('[data-era]').forEach(b=>b.onclick=()=>{abaEra=+b.dataset.era;renderPainel()});
-  c.querySelectorAll('[data-pz]').forEach(b=>b.onclick=()=>{const q=PESQUISAS.find(x=>x.id===b.dataset.pz);if(n.pf[q.id])return;const r=SIM.pesquisar(S.jog,q.id);if(r==='ok')toast('🔬 Pesquisando: '+q.nome,'info',1600);else toast(q.tipo==='era'&&!SIM.pesqDisponivel(S.jog,q)&&q.era<=n.era?'Conclua 5 pesquisas desta era primeiro.':r);renderPainel()})}
- if(p==='diplo'){if(auto&&c.querySelector('.modal'))return;const vivos=Object.keys(S.nac).filter(i=>i!==S.jog&&S.nac[i].vivo&&S.prov.some(x=>x.d===i));const viz=new Set(SIM.vizinhosNac(S.jog));
-  const ordem=id=>(SIM.emGuerra(id,S.jog)?0:SIM.aliado(id,S.jog)?1:viz.has(id)?2:3)*1e7-SIM.poder(id);vivos.sort((a,b)=>ordem(a)-ordem(b));
-  c.innerHTML=(S.prop.length?`<div class="sec">Propostas recebidas</div>`+S.prop.map((pr,i)=>`<div class="prop">${band(pr.de).replace('class="band"','class="band" style="width:24px;height:16px;vertical-align:-3px"')} ${pr.txt}<div class="acoes"><button data-resp="${i}:0">Recusar</button><button class="prim" data-resp="${i}:1">Aceitar</button></div></div>`).join(''):'')+
-  `<div class="sec">Nações do mundo</div>`+vivos.map(id=>{const r=SIM.rel(id,S.jog);return `<button class="linha nacrow" data-nac="${id}">${band(id)}<span class="meio"><b>${SIM.nomeNac(id)}</b><small>${PERSONAS[S.nac[id].persona].n}${viz.has(id)?' · vizinho':''}</small><div class="relbar"><i style="left:${(r+100)/2}%"></i></div></span><span class="dir">${SIM.emGuerra(id,S.jog)?'<span class="chip guerra">Guerra</span>':SIM.aliado(id,S.jog)?'<span class="chip ali">Aliado</span>':''}${S.com[[id,S.jog].sort().join('|')]?'<span class="chip com">Comércio</span>':''}</span></button>`}).join('');
-  c.querySelectorAll('[data-resp]').forEach(b=>b.onclick=()=>{const [i,s]=b.dataset.resp.split(':').map(Number);const pr=S.prop[i];SIM.responderProposta(i,!!s);if(s)toast('Acordo aceito com '+SIM.nomeNac(pr.de)+'.','alianca');MAPA.sujar();renderPainel()});
-  c.querySelectorAll('[data-nac]').forEach(b=>b.onclick=()=>detalheNac(b.dataset.nac))}
- if(p==='noticias'){const ic={guerra:'⚔️',paz:'🕊️',alianca:'🤝',traicao:'🗡️',revolta:'🔥',conquista:'🚩',era:'⏳',combate:'💥',info:'📰'};
-  c.innerHTML=S.news.slice(0,120).map(n=>`<div class="news ${n.imp?'imp':''}"><span class="ic ${n.tipo}">${ic[n.tipo]||'📰'}</span><span><small>${SIM.dataTxt(n.dia)}</small>${n.txt}</span></div>`).join('')}
- if(p==='menu'){c.innerHTML=`<div class="sec">Ranking mundial</div>${rankingHTML()}<div class="sec">Jogo</div>
-  <div class="acoes" style="grid-template-columns:1fr 1fr"><button data-m="salvar">💾 Salvar agora</button><button data-m="tut">🎓 Tutorial</button><button data-m="como">❓ Como jogar</button><button data-m="cine">🎬 Ver abertura da era</button><button data-m="novo" class="perigo">Nova campanha</button><button data-m="tela">⛶ Tela cheia</button></div>
-  <p style="color:var(--mut);font-size:11.5px;margin-top:14px">O jogo salva sozinho a cada 25 segundos neste aparelho. Dificuldade: ${['Fácil','Normal','Difícil'][S.dific??1]}.</p>`;
-  c.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{const m=b.dataset.m;if(m==='salvar'){salvar();toast('Jogo salvo!','paz',1500)}if(m==='tut'){fecharPainel();tutorial()}if(m==='como')comoJogar();if(m==='cine'){cinematica(Math.min(3,S.nac[S.jog].era))}if(m==='tela'){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen().catch(()=>{})}
-   if(m==='novo')modal(`<h3>Nova campanha?</h3><p>O progresso atual será apagado.</p><div class="acoes" style="grid-template-columns:1fr 1fr"><button data-fechar>Cancelar</button><button class="perigo" onclick="localStorage.removeItem('${SAVE}');location.reload()">Apagar e recomeçar</button></div>`)})}
- if(auto)c.scrollTop=st}
-function rankingHTML(){const vivos=Object.keys(S.nac).filter(i=>S.nac[i].vivo&&S.prov.some(x=>x.d===i));const cont={};S.prov.forEach(p=>cont[p.d]=(cont[p.d]||0)+1);const r=vivos.map(id=>({id,p:SIM.poder(id)})).sort((a,b)=>b.p-a.p);const pos=r.findIndex(x=>x.id===S.jog);
- return r.slice(0,10).map((x,i)=>`<div class="linha nacrow" style="${x.id===S.jog?'border-color:var(--ac)':''}"><b style="width:22px;font-family:Oswald;font-size:16px">${i+1}</b>${band(x.id)}<span class="meio"><b>${SIM.nomeNac(x.id)}</b><small>${cont[x.id]} províncias</small></span><span class="dir">${fmt(x.p)}</span></div>`).join('')+(pos>=10?`<div class="linha" style="border-color:var(--ac)"><b style="width:22px">${pos+1}</b>${band(S.jog)}<span class="meio"><b>${SIM.nomeNac(S.jog)}</b><small>${cont[S.jog]||0} províncias</small></span><span class="dir">${fmt(r[pos].p)}</span></div>`:'')}
-function detalheNac(id){const n=S.nac[id];const r=SIM.rel(id,S.jog);const g=SIM.emGuerra(id,S.jog),al=SIM.aliado(id,S.jog);const cont=S.prov.filter(p=>p.d===id).length;const k=[id,S.jog].sort().join('|');
- modal(`<div class="cab">${band(id)}<div><h3>${SIM.nomeNac(id)}</h3><div class="sub">${PERSONAS[n.persona].n} · ${cont} províncias · ${ERAS[Math.min(3,n.era)].curto}</div></div><button class="x" data-fechar>✕</button></div>
- <div class="chips">${g?'<span class="chip guerra">Em guerra com você</span>':al?'<span class="chip ali">Aliado</span>':'<span class="chip">Em paz</span>'}${S.com[k]?'<span class="chip com">Comércio</span>':''}${S.vis[id+'>'+S.jog]?'<span class="chip">Visão compartilhada</span>':''}</div>
- <div style="font-size:12px;color:var(--mut)">Relação com você: <b style="color:${r>20?'#5be37a':r<-20?'#ff6b6b':'#ddd'}">${Math.round(r)}</b></div><div class="relbar" style="width:100%;margin:6px 0 10px"><i style="left:${(r+100)/2}%"></i></div>
- <div style="font-size:12px;color:var(--mut);margin-bottom:6px">Força militar: ${fmt(SIM.poder(id))} (você: ${fmt(SIM.poder(S.jog))})</div>
- <div class="acoes" style="grid-template-columns:1fr 1fr">
- ${g?`<button class="prim" data-pr="paz">🕊️ Propor paz</button>`:`<button class="prim" data-pr="ali" ${al?'disabled':''}>🤝 Aliança</button>`}
- <button data-pr="com" ${g||S.com[k]?'disabled':''}>💰 Comércio</button><button data-pr="vis" ${g||S.vis[id+'>'+S.jog]?'disabled':''}>👁️ Visão</button><button data-pr="pre">🎁 Presente (200)</button>
- ${al?`<button class="perigo" data-pr="romper">Romper aliança</button>`:''}${g?'':`<button class="perigo" data-pr="guerra">⚔️ Declarar guerra</button>`}
- <button data-ver>📍 Ver no mapa</button></div>`);
- $$('#modalC [data-pr]').forEach(b=>b.onclick=()=>{const t=b.dataset.pr;const go=()=>{const res=SIM.propor(t,id);if(res==='ACEITO'){toast({paz:'🕊️ Paz assinada!',ali:'🤝 Aliança formada!',com:'💰 Acordo comercial fechado!',vis:'👁️ Visão compartilhada!',pre:'🎁 Presente enviado. Relação melhorou.',guerra:'⚔️ Guerra declarada!',romper:'Aliança rompida.'}[t]+' — '+SIM.nomeNac(id),t==='guerra'?'guerra':'alianca')}else toast(res,'info',4200);MAPA.sujar();detalheNac(id);if(painelAtual)renderPainel(true)};
-  if(t==='guerra'){modal(`<h3>Declarar guerra?</h3><p>Você vai declarar guerra a <b>${SIM.nomeNac(id)}</b>.${al?' Isso é uma <b>traição</b> e outros países vão confiar menos em você.':''} Os aliados dele podem entrar na guerra.</p><div class="acoes" style="grid-template-columns:1fr 1fr"><button data-fechar>Cancelar</button><button class="perigo" id="cg">Declarar</button></div>`);$('#cg').onclick=()=>{fecharModal();go()}}else go()});
- const v=$('#modalC [data-ver]');v.onclick=()=>{fecharModal();fecharPainel();const c=P[n.cap];MAPA.voar(c.x,c.y,Math.max(.8,MAPA.cam.z))}}
+$$('#nav button').forEach(b=>b.onclick=()=>{const p=b.dataset.p;if(p==='mapa'||painelAtual===p){fecharPainel();return}abrirPainel(p)});
+$('#painelX').onclick=fecharPainel;
+function abrirPainel(p){painelAtual=p;fecharSheet();if(modo)sairModo();$$('#nav button').forEach(b=>b.classList.toggle('ativo',b.dataset.p===p));$('#painel').classList.remove('oculto');$('#painelC').scrollTop=0;renderPainel();hud()}
+function fecharPainel(){painelAtual=null;$('#painel').classList.add('oculto');$$('#nav button').forEach(b=>b.classList.toggle('ativo',b.dataset.p==='mapa'))}
+function renderPainel(){const p=painelAtual;const c=$('#painelC');const T={pesquisa:'Pesquisa',diplo:'Diplomacia',noticias:'Notícias do mundo',menu:'Menu'};$('#painelT').textContent=T[p];
+ const n=S.nac[S.jog];const e=S.eraMundo;
+ if(p==='pesquisa'){const pz=SIM.PESQ.filter(z=>z.era===e);const feitos=pz.filter(z=>n.pq[z.id]).length;const ce=SIM.custoEra(e);
+  c.innerHTML=`<div class="era-banner" style="background-image:linear-gradient(90deg,rgba(0,0,0,.85),rgba(0,0,0,.2)),url(img/era${e}.webp)"><small>ERA ATUAL</small><h2>${ERAS[e].nome}</h2><p>${ERAS[e].sub}</p></div>
+  <div class="sec">Melhorias desta era</div><div class="pesq">${pz.map(z=>{const ok=n.pq[z.id];return `<div class="pz ${ok?'feito':''}"><img src="${imgT(z.k,e)}" alt=""><div class="pz-t"><b>${SIM.TIPOS[z.k].cat} +20%</b><small>${z.nome} · ${z.desc}</small></div>${ok?'<span class="max">✔ Feito</span>':`<button class="bt mini" data-pz="${z.id}">${icone('dinheiro',12)}${z.custo.din}${z.custo.pet?` ${icone('petroleo',12)}${z.custo.pet}`:''}</button>`}</div>`}).join('')}</div>
+  ${e<3?`<div class="sec">Próxima era</div><div class="prox-era" style="background-image:linear-gradient(90deg,rgba(0,0,0,.88),rgba(0,0,0,.35)),url(img/era${e+1}.webp)"><h3>${ERAS[e+1].nome}</h3><p>${ERAS[e+1].ano} · ${ERAS[e+1].sub}</p><div class="imgs">${TK.map(k=>`<img src="${imgT(k,e+1)}" alt="">`).join('')}</div>
+   <p class="req">${feitos>=2?'✔':'✖'} 2 melhorias desta era (${feitos}/3) · ${icone('dinheiro',12)}${ce.din} ${icone('petroleo',12)}${ce.pet}</p><button class="bt bt-ouro" data-era ${feitos>=2?'':'disabled'}>Avançar para ${ERAS[e+1].ano}</button><small>Ou espere o calendário chegar em ${ERAS[e+1].ano}. Avançar leva o mundo inteiro junto.</small></div>`:'<p class="ajuda">Você está na última era. Domine o mundo até 2030!</p>'}`;
+  $$('#painelC [data-pz]').forEach(b=>b.onclick=()=>{const r=SIM.pesquisar(b.dataset.pz);if(r==='ok')toast('Pesquisa concluída! Suas tropas ficaram mais fortes.','ok');else toast(r);renderPainel();hud()});
+  const be=c.querySelector('[data-era]');if(be)be.onclick=()=>{const r=SIM.avancarEra();if(r!=='ok'){toast(r);return}fecharPainel();MAPA.sujar()}}
+ else if(p==='diplo'){const props=S.prop;const vivos=id=>S.nac[id]&&S.nac[id].vivo&&SIM.cidadesDe(id).length;const guerras=SIM.guerrasDe(S.jog).filter(vivos),alis=SIM.aliadosDe(S.jog).filter(vivos);const viz=SIM.vizinhosNac(S.jog).filter(x=>!guerras.includes(x)&&!alis.includes(x));
+  const cont={};S.prov.forEach(q=>cont[q.d]=(cont[q.d]||0)+1);const grandes=Object.keys(S.nac).filter(id=>id!==S.jog&&vivos(id)&&!guerras.includes(id)&&!alis.includes(id)&&!viz.includes(id)).sort((a,b)=>(cont[b]||0)-(cont[a]||0)).slice(0,6);
+  const linha=id=>`<div class="nrow">${band(id)}<div class="nr-t"><b>${SIM.nomeNac(id)}</b><small>${cont[id]||0} cidades · ${PERSONAS[S.nac[id].persona].n}</small></div><div class="nr-b">${diploBts(id)}</div></div>`;
+  c.innerHTML=`${props.length?`<div class="sec">Propostas (${props.length})</div>${props.map((pr,i)=>`<div class="prop">${band(pr.de)}<p>${pr.txt}</p><div class="acoes"><button class="bt" data-pn="${i}">Recusar</button><button class="bt bt-ouro" data-ps="${i}">Aceitar</button></div></div>`).join('')}`:''}
+  <div class="sec">Em guerra (${guerras.length})</div>${guerras.map(linha).join('')||'<p class="ajuda">Você está em paz com todos.</p>'}
+  <div class="sec">Aliados (${alis.length})</div>${alis.map(linha).join('')||'<p class="ajuda">Nenhum aliado. Ter um inimigo em comum ajuda a fechar alianças.</p>'}
+  <div class="sec">Vizinhos</div>${viz.map(linha).join('')||'<p class="ajuda">—</p>'}
+  <div class="sec">Potências</div>${grandes.map(linha).join('')}`;
+  $$('#painelC [data-ps]').forEach(b=>b.onclick=()=>{SIM.responder(S.prop[+b.dataset.ps],true);MAPA.sujar();renderPainel();hud()});$$('#painelC [data-pn]').forEach(b=>b.onclick=()=>{SIM.responder(S.prop[+b.dataset.pn],false);renderPainel();hud()});ligarDiplo(c)}
+ else if(p==='noticias'){lidas=S.news.length;const IC={guerra:'⚔️',paz:'🕊️',alianca:'🤝',traicao:'🗡️',revolta:'🔥',era:'🕰️',conquista:'🏴',info:'📰'};
+  c.innerHTML=S.news.slice(0,80).map(x=>`<div class="news ${x.meu?'meu':''}"><span class="ic">${IC[x.tipo]||'📰'}</span><div><p>${x.txt}</p><small>${SIM.dataTxt(x.dia)}</small></div></div>`).join('')}
+ else if(p==='menu'){const cont={};S.prov.forEach(q=>cont[q.d]=(cont[q.d]||0)+1);const rk=Object.keys(cont).filter(id=>S.nac[id]).sort((a,b)=>cont[b]-cont[a]).slice(0,10);
+  c.innerHTML=`<div class="stats"><div><b>${cont[S.jog]||0}</b><small>cidades</small></div><div><b>${S.stats.conq}</b><small>conquistas</small></div><div><b>${S.stats.vit}</b><small>vitórias</small></div><div><b>${S.stats.perd}</b><small>perdidas</small></div></div>
+  <div class="sec">Ranking mundial</div>${rk.map((id,i)=>`<div class="nrow ${id===S.jog?'eu':''}"><span class="pos">${i+1}</span>${band(id)}<div class="nr-t"><b>${SIM.nomeNac(id)}</b><small>${cont[id]} cidades</small></div></div>`).join('')}
+  <div class="menu-bts"><button class="bt" id="mSalvar">💾 Salvar jogo</button><button class="bt" id="mComo">❓ Como jogar</button><button class="bt" id="mMis">🎯 Ver missão</button><button class="bt perigo" id="mSair">🏠 Sair para o início</button></div>`;
+  $('#mSalvar').onclick=()=>{salvar();toast('Jogo salvo neste aparelho.','ok')};$('#mComo').onclick=()=>comoJogar();$('#mMis').onclick=()=>{fecharPainel();missaoInfo()};$('#mSair').onclick=()=>{salvar();location.reload()}}}
 // ---------- modal
-function modal(h){$('#modalC').innerHTML=h;$('#modal').classList.remove('oculto');pausadoUI=true;$$('#modalC [data-fechar]').forEach(b=>b.onclick=fecharModal)}
-function fecharModal(){$('#modal').classList.add('oculto');pausadoUI=false}
-$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')fecharModal()});
+let depoisModal=null;
+function modal(h,depois){$('#modalC').innerHTML=h;$('#modal').classList.remove('oculto');depoisModal=depois||null;$$('#modalC [data-fechar]').forEach(b=>b.onclick=fecharModal)}
+function fecharModal(){$('#modal').classList.add('oculto');const d=depoisModal;depoisModal=null;if(d)d()}
 // ---------- cinemática de era
-const CINE_FUNDO=['radial-gradient(ellipse at 50% 40%,#6b4e2a 0%,#2a1b0c 55%,#0d0804 100%)','radial-gradient(ellipse at 50% 40%,#5a5330 0%,#23200f 55%,#080805 100%)','radial-gradient(ellipse at 50% 40%,#16456e 0%,#071a2c 55%,#02060b 100%)','radial-gradient(ellipse at 50% 40%,#0f4a44 0%,#04161a 55%,#010405 100%)'];
-const CINE_UNID=[['inf','arm','art','fig','nav','sub'],['inf','arm','art','fig','bom','car'],['inf','arm','hel','fig','mis','sub'],['inf','arm','dro','fig','bom','nav']];
-function cinematica(e,depois){const c=$('#cine');pausadoUI=true;const ano=ERAS[e].ano;const anoAnt=e?ERAS[e-1].ano:1900;
- let fag='';for(let i=0;i<26;i++)fag+=`<span class="fagulha" style="left:${Math.random()*100}%;bottom:-10px;animation-duration:${4+Math.random()*6}s;animation-delay:${-Math.random()*8}s;${e>=2?'background:#7fe3ff;box-shadow:0 0 6px #2bc4ff':''}"></span>`;
- c.innerHTML=`<div class="fundo" style="background:${CINE_FUNDO[e]}"></div>${fag}<div class="faixa" style="top:18%"></div><div class="faixa" style="bottom:18%"></div>
- <div style="font-family:Oswald;letter-spacing:.5em;font-size:12px;color:${TEMAS[e].acento}">ERA ${e+1} DE 4</div><div class="ano" id="cAno">${anoAnt}</div><div class="titulo" style="color:${TEMAS[e].acento}">${ERAS[e].nome.toUpperCase()}</div><div class="lema">“${ERAS[e].lema}”</div><div class="sub">${ERAS[e].sub}${e===0?'<br><br>Você comanda <b>'+SIM.nomeNac(S.jog)+'</b>.':''}</div>
- <div class="tropas">${CINE_UNID[e].map((t,i)=>`<div style="animation-delay:${1.6+i*.15}s">${ART.svg(t,Math.max(e,UNIDADES[t].era0))}</div>`).join('')}</div><button class="bt bt-ouro" id="cOk">${e===0?'COMEÇAR A GUERRA':'CONTINUAR'}</button>`;
- c.classList.remove('oculto');const el=$('#cAno');const t0=performance.now();const anim=t=>{const f=Math.min(1,(t-t0)/1400);el.textContent=Math.round(anoAnt+(ano-anoAnt)*(1-Math.pow(1-f,3)));if(f<1)requestAnimationFrame(anim)};requestAnimationFrame(anim);
- $('#cOk').onclick=()=>{c.classList.add('oculto');pausadoUI=false;hud();if(depois)depois()}}
-window.__cine=cinematica;
-// ---------- tutorial
-const PASSOS=[
- {t:'Bem-vindo, comandante!',p:()=>`Você governa <b>${SIM.nomeNac(S.jog)}</b> em 1914. Seu território tem a borda brilhante. A estrela marca sua capital.`,alvo:null,acao:()=>{const c=P[S.nac[S.jog].cap];MAPA.voar(c.x,c.y,1.2)}},
- {t:'Recursos',p:()=>'Aqui ficam comida, bens, metal, petróleo, materiais raros, dinheiro e soldados. O número verde é quanto você ganha por dia.',alvo:'#recursos'},
- {t:'Mover tropas',p:()=>'Os quadradinhos com desenho e número são exércitos. Toque num exército seu e depois toque no destino. Em território inimigo ele luta e conquista.',alvo:null,acao:()=>{const a=S.exs.find(x=>x.dono===S.jog&&!SIM.ehNaval(x));if(a){MAPA.voar(a.x,a.y,1.6)}}},
- {t:'Construir e recrutar',p:()=>'Toque numa província sua para construir quartéis, fábricas, portos e aeródromos, e para recrutar tropas.',alvo:null},
- {t:'Pesquisa e eras',p:()=>'Pesquise novas armas. Em 1939 começa a 2ª Guerra, em 1947 a Guerra Fria e em 1991 a Guerra Moderna — ou chegue antes pela pesquisa!',alvo:'#nav [data-p=pesquisa]'},
- {t:'Diplomacia',p:()=>'Faça alianças, comércio, paz ou declare guerra. Os outros países têm personalidade: alguns são leais, outros traiçoeiros.',alvo:'#nav [data-p=diplo]'},
- {t:'Controle do tempo',p:()=>'Pause ou acelere o tempo aqui. Boa sorte, comandante!',alvo:'#vel'}];
-let passo=0;
-function tutorial(){tutAtivo=true;passo=0;setVel(0);$('#tut').classList.remove('oculto');mostrarPasso()}
-function mostrarPasso(){const P2=PASSOS[passo];if(P2.acao)P2.acao();const foco=$('#tutFoco'),cx=$('#tutCaixa');
- if(P2.alvo){const r=$(P2.alvo).getBoundingClientRect();foco.style.cssText=`left:${r.left-4}px;top:${r.top-4}px;width:${r.width+8}px;height:${r.height+8}px;opacity:1`}else foco.style.cssText=`left:50%;top:45%;width:0;height:0;opacity:1`;
- const embaixo=P2.alvo&&$(P2.alvo).getBoundingClientRect().top<innerHeight/2;cx.style.top=embaixo?'auto':'auto';cx.style.bottom=embaixo?'90px':'auto';if(!embaixo)cx.style.top=P2.alvo?'calc(var(--sa) + 120px)':'auto',cx.style.bottom=P2.alvo?'auto':'110px';
- cx.innerHTML=`<small style="color:var(--mut);font-weight:800;letter-spacing:.1em">PASSO ${passo+1} DE ${PASSOS.length}</small><h3>${P2.t}</h3><p>${P2.p()}</p><div class="acoes"><button id="tPular">Pular</button><button class="prim" id="tProx">${passo<PASSOS.length-1?'Próximo':'Jogar!'}</button></div>`;
- $('#tPular').onclick=fimTut;$('#tProx').onclick=()=>{passo++;if(passo>=PASSOS.length)fimTut();else mostrarPasso()}}
-function fimTut(){tutAtivo=false;$('#tut').classList.add('oculto');localStorage.setItem('guerras_tut_ok','1');setVel(1)}
+function cinematica(e,depois){const c=$('#cine');c.classList.remove('oculto');const n=S.nac[S.jog];
+ c.innerHTML=`<div class="cine-fundo" style="background-image:url(img/era${e}.webp)"></div><div class="cine-c"><small>ERA ${e+1} DE 4</small><div class="ano">${ERAS[e].ano}</div><h2>${ERAS[e].nome}</h2><p class="lema">“${ERAS[e].lema}”</p>
+  <div class="cine-tropas">${TK.map((k,i)=>`<div style="animation-delay:${.3+i*.2}s"><img src="${imgT(k,e)}" alt=""><small>${nomeT(k,e)}</small></div>`).join('')}</div>
+  <p class="sub">${e?'Suas tropas evoluíram automaticamente.':'Você comanda '+SIM.oNac(S.jog)+'.'}</p><button class="bt bt-ouro grande" id="cOk">${e?'Continuar':'Começar a guerra'}</button></div>`;
+ $('#cOk').onclick=()=>{c.classList.add('oculto');if(depois)depois()}}
+// ---------- missões
+const MIS=[
+ {id:'atk',t:'Ataque a cidade marcada',d:'Toque na cidade com a <b>seta laranja</b> e depois em <b>ATACAR</b>.',ok:b=>S.stats.vit+S.stats.der>b.vd,alvo:1,premio:200},
+ {id:'rec',t:'Recrute 3 tropas',d:'Toque numa cidade sua e use os botões <b>+1</b>.',ok:b=>S.stats.rec>=b.rec+3,premio:150},
+ {id:'mov',t:'Mova tropas para a fronteira',d:'Toque numa cidade sua e depois numa cidade <b class="verde">verde</b> vizinha.',ok:b=>S.stats.mov>b.mov,premio:100},
+ {id:'ref',t:'Coloque seus reforços',d:'Todo mês chegam reforços. Toque em <b>🎖️ reforços</b> lá em cima e depois numa cidade sua.',ok:b=>(S.stats.ref||0)>b.ref,premio:100},
+ {id:'conq',t:'Conquiste 3 cidades',d:'Ataque cidades vizinhas. Some tropas de várias cidades para ataques fortes.',ok:b=>S.stats.conq>=b.conq+3,prog:b=>[S.stats.conq-b.conq,3],alvo:1,premio:300},
+ {id:'cons',t:'Construa uma Fábrica ou Fortaleza',d:'Toque numa cidade sua e role até <b>Construções</b>.',ok:b=>S.stats.cons>b.cons,premio:150},
+ {id:'pesq',t:'Pesquise uma melhoria',d:'Abra <b>Pesquisa</b> no menu de baixo e deixe suas tropas mais fortes.',ok:b=>S.stats.pesq>b.pesq,premio:200},
+ {id:'cap',t:'Conquiste uma capital inimiga',d:'Capitais têm uma ★. Elas dão +20% de defesa, então junte bastante tropa.',ok:b=>(S.stats.caps||0)>b.caps,alvo:2,premio:500},
+ {id:'era',t:'Avance para a próxima era',d:'Em <b>Pesquisa</b>, faça 2 melhorias e avance de era (ou espere o calendário).',ok:b=>S.eraMundo>b.era,premio:600},
+ {id:'conq2',t:'Conquiste 10 cidades',d:'Expanda seu país. Use reforços nas fronteiras.',ok:b=>S.stats.conq>=b.conq+10,prog:b=>[S.stats.conq-b.conq,10],alvo:1,premio:800}];
+function misAtual(){const i=S.mis||0;return i<MIS.length?MIS[i]:MIS[MIS.length-1-(i-MIS.length)%2]}
+function base(){return {vd:S.stats.vit+S.stats.der,rec:S.stats.rec,mov:S.stats.mov,ref:S.stats.ref||0,conq:S.stats.conq,cons:S.stats.cons,pesq:S.stats.pesq,caps:S.stats.caps||0,era:S.eraMundo}}
+function alvoSugerido(cap){let best=null,bs=-1e9;const meus=SIM.cidadesDe(S.jog);const vist=new Set();
+ for(const m of meus)for(const q of SIM.viz(m)){if(vist.has(q))continue;vist.add(q);const d=S.prov[q].d;if(d===S.jog||SIM.aliado(d,S.jog))continue;if(cap&&!SIM.ehCapital(q))continue;const f=SIM.fontesPara(q);if(!f.length)continue;const pr=SIM.prepararAtaque(f,q,1);let s=pr.chance+(SIM.emGuerra(d,S.jog)?.35:0)+(SIM.porMar(f[0],q)?-.15:0)-SIM.cidadesDe(d).length/400;const C=SIM.P[S.nac[S.jog].cap],Q=SIM.P[q];s-=Math.hypot(C.x-Q.x,C.y-Q.y)/(SIM.MW||2000)*3;if(s>bs){bs=s;best=q}}
+ if(cap&&best==null)return alvoSugerido(false);return best}
+function missoes(abrir){if(!S||demo||!S.nac[S.jog])return;S.misIni=S.misIni||{};let m=misAtual();const k=(S.mis||0)+'';if(!S.misIni[k])S.misIni[k]=base();const b=S.misIni[k];
+ if(m.ok(b)){S.nac[S.jog].din+=m.premio;toast(`🎯 Missão cumprida: <b>${m.t}</b> · +${m.premio} ${icone('dinheiro',12)}`,'ok');S.mis=(S.mis||0)+1;m=misAtual();S.misIni[S.mis+'']=base();abrir=true;MAPA.missao=null}
+ if(m.alvo){const a=MAPA.missao;if(a==null||S.prov[a].d===S.jog||!SIM.fontesPara(a).length)MAPA.missao=alvoSugerido(m.alvo===2)}else MAPA.missao=null;
+ const bb=S.misIni[(S.mis||0)+''];const pg=m.prog?m.prog(bb):null;
+ $('#missao').innerHTML=`<span class="mi">🎯</span><span class="mt"><small>MISSÃO ${(S.mis||0)+1}</small><b>${m.t}${pg?` (${Math.max(0,pg[0])}/${pg[1]})`:''}</b></span>`;
+ if(abrir)missaoInfo(true)}
+function missaoInfo(auto){const m=misAtual();dica(`<b>🎯 ${m.t}</b><br>${m.d}`);if(m.alvo&&MAPA.missao!=null){const p=P[MAPA.missao];const z=Math.max(2.2,MAPA.cam.z);MAPA.voar(p.x,p.y+40/z,z,.8)}clearTimeout(missaoInfo.t);missaoInfo.t=setTimeout(()=>{if(!modo)dica(null)},9000)}
+$('#missao').onclick=()=>missaoInfo();
+// ---------- eventos da simulação
+SIM.onNoticia=n=>{if(demo)return;if(n.tipo==='era')return;if(n.meu){const tp=n.tipo==='paz'||n.tipo==='alianca'?'ok':n.tipo==='guerra'||n.tipo==='traicao'||n.tipo==='conquista'?'guerra':'info';toast(n.txt,tp)}};
+SIM.onBatalha=r=>{if(demo||r.id===S.jog)return;const p=P[r.alvo];if(r.dono===S.jog){MAPA.explosao(p.x,p.y,2);if(r.vit){toast(`🏴 ${SIM.OoNac(r.id)} ${SIM.V(r.id,'tomou','tomaram')} <b>${p.n}</b>!`,'guerra')}else{toast(`🛡️ Defendemos <b>${p.n}</b> do ataque ${SIM.deNac(r.id)}!`,'ok');MAPA.texto(p.x,p.y,'DEFENDIDA','#7dff9a')}}else{const [sx,sy]=MAPA.W2S(p.x,p.y);if(sx>0&&sy>0&&sx<innerWidth&&sy<innerHeight&&Math.random()<.6)MAPA.explosao(p.x,p.y,1)}};
+SIM.onConquista=(p,id,antigo)=>{MAPA.sujar();if(sheetP===p||sel===p){if(S.prov[p].d!==S.jog&&sel===p)desselecionar();else if(sheetTipo)renderSheet()}else if(sel!=null)selecionar(sel)};
+SIM.onReforco=r=>{if(demo)return;toast(`🎖️ Chegaram <b>${r} reforços</b>! Toque no botão 🎖️ lá em cima para colocá-los.`,'ok')};
+SIM.onEra=e=>{if(demo)return;MAPA.sujar();setTimeout(()=>cinematica(e),animando?3000:100)};
+SIM.onDerrota=()=>{modal(`<h3>Seu país caiu</h3><p>${SIM.OoNac(S.jog)} foi derrotad${SIM.artigo(S.jog)==='a'?'a':'o'} em ${SIM.dataTxt(S.dia)}. Você conquistou ${S.stats.conq} cidades.</p><div class="acoes"><button class="bt bt-ouro" id="mNovo">Nova campanha</button></div>`);$('#mNovo').onclick=()=>{localStorage.removeItem(SAVE);location.reload()}};
+SIM.onFim=()=>{if(S.fim)return;S.fim=1;const cont={};S.prov.forEach(q=>cont[q.d]=(cont[q.d]||0)+1);const rk=Object.keys(cont).sort((a,b)=>cont[b]-cont[a]);const pos=rk.indexOf(S.jog)+1;modal(`<h3>Fim da campanha: 2030</h3><p>Você atravessou todas as guerras! ${SIM.OoNac(S.jog)} terminou em <b>${pos}º lugar</b> no mundo, com ${cont[S.jog]||0} cidades.</p><div class="acoes"><button class="bt bt-ouro" data-fechar>Continuar jogando</button></div>`)};
 // ---------- salvar
-function salvar(){if(demo||!S||!S.nac[S.jog])return;try{localStorage.setItem(SAVE,SIM.exportar())}catch(e){console.warn('save',e)}}
-window.addEventListener('visibilitychange',()=>{if(document.hidden)salvar()});window.addEventListener('pagehide',salvar);
-// ---------- teclado (PC)
-window.addEventListener('keydown',e=>{if(demo)return;if(e.key===' '){setVel(vel?0:1);e.preventDefault()}if(e.key==='Escape'){desselecionar();fecharPainel();fecharModal()}if('0123'.includes(e.key))setVel(+e.key)});
-// API de testes
-window.__G={get S(){return SIM.get()},SIM,MAPA,iniciar:(id,d=1)=>{SIM.novo(id);S=SIM.get();S.dific=d;iniciarJogo(true)},setVel,selecionarExe,abrirProv,abrirPainel,fecharPainel,ordenar:(id,n)=>ordenar(S.exs.find(a=>a.id===id),n),salvar,cinematica,fecharCine:()=>$('#cOk')&&$('#cOk').click(),hud,tutorial,fimTut,
- get vel(){return vel}};
-})();
+function salvar(){if(demo||!S||!S.nac[S.jog])return;try{localStorage.setItem(SAVE,SIM.exportar())}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)salvar()});
+window.__G={get S(){return SIM.get()},SIM,MAPA,iniciar:id=>{S=SIM.novo(id);iniciarJogo(false);S.mis=0;S.misIni={};missoes(true)},setVel,selecionar,abrirAtaque,abrirMover,abrirPainel,fecharPainel,salvar,cinematica,missoes,get vel(){return vel},get animando(){return animando},fecharCine:()=>{$('#cine').classList.add('oculto')},fecharModal};

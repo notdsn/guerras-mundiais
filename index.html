@@ -9,25 +9,30 @@
 <title>Guerras Mundiais — 1914 até Hoje</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.png">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
 <canvas id="mapa"></canvas>
 <div id="hud" class="oculto">
   <div class="hud-l1">
     <button id="hudNac" class="hud-nac"><span id="hudBand" class="band"></span><span><b id="hudNome">—</b><small id="hudEra">1ª GUERRA</small></span></button>
-    <div class="hud-data"><b id="hudData">28 jul 1914</b><small id="hudAno">dia 1</small></div>
-    <div id="vel" class="vel"><button data-v="0" title="Pausar">❚❚</button><button data-v="1" title="Normal">▶</button><button data-v="2" title="Rápido">▶▶</button><button data-v="3" title="Muito rápido">▶▶▶</button></div>
+    <div class="hud-data"><b id="hudData">28 jul 1914</b><small id="hudAno"></small></div>
+    <div id="vel" class="vel"><button data-v="0" aria-label="Pausar">❚❚</button><button data-v="1" aria-label="Normal">▶</button><button data-v="2" aria-label="Rápido">▶▶</button></div>
   </div>
-  <div id="recursos" class="recursos"></div>
+  <div class="hud-l2">
+    <div class="rc" id="rcDin"></div><div class="rc" id="rcPet"></div>
+    <button id="btRef" class="rc ref oculto"></button>
+  </div>
 </div>
-<div id="botoesMapa" class="oculto"><button id="zMais">+</button><button id="zMenos">−</button><button id="zCasa" title="Ir para a capital">★</button></div>
+<button id="missao" class="missao oculto"></button>
+<div id="botoesMapa" class="oculto"><button id="zMais" aria-label="Aproximar">+</button><button id="zMenos" aria-label="Afastar">−</button><button id="zCasa" aria-label="Ir para a capital">★</button></div>
 <div id="dica" class="dica oculto"></div>
 <div id="sheet" class="sheet oculto"><div class="alca"></div><div id="sheetC"></div></div>
-<div id="painel" class="painel oculto"><div class="painel-top"><h2 id="painelT"></h2><button class="x" id="painelX">✕</button></div><div id="painelC" class="painel-c"></div></div>
+<div id="atq" class="atq oculto"><div id="atqC"></div></div>
+<div id="res" class="res oculto"></div>
+<div id="painel" class="painel oculto"><div class="painel-top"><h2 id="painelT"></h2><button class="x" id="painelX" aria-label="Fechar">✕</button></div><div id="painelC" class="painel-c"></div></div>
 <nav id="nav" class="oculto">
   <button data-p="mapa" class="ativo"><i data-ic="mapa"></i><span>Mapa</span></button>
-  <button data-p="exercitos"><i data-ic="exercito"></i><span>Exércitos</span></button>
   <button data-p="pesquisa"><i data-ic="pesquisa"></i><span>Pesquisa</span></button>
   <button data-p="diplo"><i data-ic="diplo"></i><span>Diplomacia</span><em id="bDiplo" class="badge oculto"></em></button>
   <button data-p="noticias"><i data-ic="noticias"></i><span>Notícias</span><em id="bNews" class="badge oculto"></em></button>
@@ -36,12 +41,11 @@
 <div id="toasts"></div>
 <div id="modal" class="modal oculto"><div class="modal-c" id="modalC"></div></div>
 <div id="cine" class="cine oculto"></div>
-<div id="tut" class="tut oculto"><div id="tutFoco" class="tut-foco"></div><div id="tutCaixa" class="tut-caixa"></div></div>
 <div id="inicio" class="inicio">
   <div class="inicio-fundo"></div>
   <div class="inicio-c">
     <div class="logo"><small>CAMPANHA MUNDIAL</small><h1>GUERRAS<br>MUNDIAIS</h1><div class="eras-linha"><span>1914</span><i></i><span>1939</span><i></i><span>1947</span><i></i><span>1991</span><i></i><span>HOJE</span></div></div>
-    <p class="inicio-sub">Uma única campanha que atravessa todas as guerras: das trincheiras da 1ª Guerra até os drones da guerra moderna.</p>
+    <p class="inicio-sub">Escolha seu país, ataque as cidades vizinhas e atravesse todas as guerras: das trincheiras de 1914 aos drones de hoje.</p>
     <div class="inicio-bts">
       <button id="btContinuar" class="bt bt-ouro oculto">Continuar campanha</button>
       <button id="btNovo" class="bt bt-ouro">Nova campanha</button>
@@ -51,11 +55,11 @@
   </div>
 </div>
 <div id="escolha" class="escolha oculto"></div>
-<script src="js/geo.js"></script>
-<script src="js/data.js"></script>
-<script src="js/art.js"></script>
-<script src="js/sim.js"></script>
-<script src="js/map.js"></script>
-<script src="js/ui.js"></script>
+<script src="js/geo.js?v=2"></script>
+<script src="js/data.js?v=2"></script>
+<script src="js/art.js?v=2"></script>
+<script src="js/jogo.js?v=2"></script>
+<script src="js/map.js?v=2"></script>
+<script src="js/ui.js?v=2"></script>
 </body>
 </html>

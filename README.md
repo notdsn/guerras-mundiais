@@ -1,14 +1,20 @@
-# Guerras Mundiais
+# Guerras Mundiais — 1914 → hoje (v2)
 
-Jogo de estratégia em tempo real no navegador, no estilo Supremacy 1914 / Call of War / Conflict of Nations.
-Uma única campanha atravessa todas as guerras: **1914 (1ª Guerra) → 1939 (2ª Guerra) → 1947 (Guerra Fria) → 1991 (Guerra Moderna)**.
+Jogo de estratégia no navegador, em português, feito para celular (funciona no PC).
+Mistura o estilo **WAR** (número de tropas em cada cidade, reforços, atacar vizinho, defender, mover tropas)
+com uma campanha histórica no **mapa-múndi real**: 1ª Guerra (1914) → 2ª Guerra (1939) → Guerra Fria (1947) → Guerra Moderna (1991+).
 
 **Jogar:** https://notdsn.github.io/guerras-mundiais/
 
-- Mapa-múndi real com ~1265 províncias, terreno, recursos e névoa de guerra
-- Escolha qualquer país; IA com personalidades, diplomacia, alianças, traições e revoltas
-- Exércitos terrestres, navais e aéreos; unidades e pesquisas evoluem a cada era
-- Feito para celular (toque) e também funciona no PC
-- Salva no próprio navegador (localStorage)
+## Como jogar
+- Cada cidade mostra quantas tropas tem.
+- Toque numa cidade sua e depois numa cidade **vermelha** vizinha → **ATACAR**. O jogo mostra sua força, a defesa e a chance de vitória.
+- Toque numa cidade **verde** (sua) para **mover tropas**.
+- Todo mês chegam **reforços**: toque no botão 🎖️ e coloque-os nas suas cidades.
+- Recrute com um botão: Infantaria, Blindados e Aviação (melhoram sozinhos a cada era).
+- Construções simples: Fábrica (mais dinheiro) e Fortaleza (mais defesa).
+- Pesquisa: 3 melhorias por era e o botão para avançar de era.
+- Diplomacia: paz, aliança, guerra. Países da IA fazem alianças, traem, sofrem revoltas.
+- Missões guiadas com seta no mapa e jornal com as notícias da guerra.
 
-Mapa: dados do Natural Earth (domínio público).
+Tudo em JavaScript puro + Canvas, sem servidor. Salva no próprio navegador.
