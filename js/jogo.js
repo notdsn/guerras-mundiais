@@ -30,11 +30,16 @@ const viz=p=>P[p].a.concat(P[p].m);SIM.viz=viz;
 const K=(a,b)=>a<b?a+'|'+b:b+'|'+a;
 let S=null;SIM.get=()=>S;
 const rnd=()=>Math.random();const N=id=>S.nac[id];
-SIM.nomeNac=id=>{const n=S&&S.nac[id];const e=n?Math.min(3,n.era):0;if(NOMES[id])return NOMES[id][e];return (n&&n.nome)||(CT[id]||{}).n||id};
+const nomeBase=id=>{const n=S&&S.nac[id];const e=n?Math.min(3,n.era):0;if(NOMES[id])return NOMES[id][e];return (n&&n.nome)||(CT[id]||{}).n||id};SIM.nomeBase=nomeBase;
+SIM.nomeNac=id=>{const n=S&&S.nac[id];const b=nomeBase(id);if(!n||!n.tier)return b;const dB=()=>{const a=artBase(b);return ({'':'de ',o:'do ',a:'da ',os:'dos ',as:'das '})[a]+b};
+ const sh=(CT[id]&&CT[id].n)||b;const dS=()=>{const a=artBase(sh);return ({'':'de ',o:'do ',a:'da ',os:'dos ',as:'das '})[a]+sh};
+ const mon=/^(Império|Reino|Sultanato|Emirado|Grão)/.test(b),gov=/^(República|Estados|União|Federação|Confederação|Domínio|Raj)/.test(b);
+ if(n.tier===1)return mon?'Grande '+b:gov?b:'Reino '+dB();if(n.tier===2)return /^Império/.test(b)?b+' Supremo':'Império '+dS();return 'Superpotência '+dS()};
 // artigos em português (para a Bélgica, do Brasil, à França, aos Estados Unidos)
 const SEM_ART=['Portugal','Israel','Cuba','Angola','Moçambique','Taiwan','Mônaco','Malta','Chipre','Timor-Leste','Singapura','Hong Kong','Andorra','Omã','Mianmar','Madagascar','Belize','Fiji','Cabo Verde','São Tomé e Príncipe','Granada','Barbados','Jamaica','Trinidad e Tobago','Porto Rico','Samoa','Tonga','Kosovo','Montenegro','Djibuti','Bahrein','Mali','Andorra','Luxemburgo','Liechtenstein'];
 const MASC=/^(Império|Reino|Sultanato|Emirado|Domínio|Raj|Canadá|Japão|Brasil|México|Peru|Chile|Uruguai|Paraguai|Equador|Egito|Irã|Iraque|Iêmen|Líbano|Sudão|Chade|Níger|Marrocos|Congo|Gabão|Senegal|Togo|Benin|Quênia|Zimbábue|Malawi|Malaui|Afeganistão|Paquistão|Nepal|Butão|Vietnã|Laos|Camboja|Cazaquistão|Uzbequistão|Turcomenistão|Quirguistão|Tadjiquistão|Azerbaijão|Sri Lanka|Bangladesh|Catar|Kuwait|Haiti|Panamá|Suriname|Lesoto|Botsuana|Burundi|Ruanda|Saara|Sião|Tibete|Vaticano|Camarões|Brunei|Gana|Zaire|Turquestão|Saara Ocidental|Sudão do Sul|Benim|Iémen|Kuwait|Omã)/;
-function artigo(id){const n=SIM.nomeNac(id);if(SEM_ART.includes(n))return '';if(/^(Estados Unidos|Países Baixos|Emirados|Camarões)/.test(n))return 'os';if(/^(Ilhas|Filipinas|Maldivas|Bahamas|Seicheles|Comores)/.test(n))return 'as';if(MASC.test(n))return 'o';if(/a$/.test(n)||/^(República|União|Federação|Confederação)/.test(n))return 'a';return 'o'}
+function artBase(n){if(SEM_ART.includes(n))return '';if(/^(Estados Unidos|Países Baixos|Emirados|Camarões)/.test(n))return 'os';if(/^(Ilhas|Filipinas|Maldivas|Bahamas|Seicheles|Comores)/.test(n))return 'as';if(MASC.test(n))return 'o';if(/a$/.test(n)||/^(República|União|Federação|Confederação)/.test(n))return 'a';return 'o'}
+function artigo(id){const n=SIM.nomeNac(id);if(/^Superpotência/.test(n))return 'a';if(/^Grande Império/.test(n))return 'o';if(SEM_ART.includes(n))return '';if(/^(Estados Unidos|Países Baixos|Emirados|Camarões)/.test(n))return 'os';if(/^(Ilhas|Filipinas|Maldivas|Bahamas|Seicheles|Comores)/.test(n))return 'as';if(MASC.test(n))return 'o';if(/a$/.test(n)||/^(República|União|Federação|Confederação)/.test(n))return 'a';return 'o'}
 SIM.artigo=artigo;
 SIM.oNac=id=>{const a=artigo(id);return (a?a+' ':'')+SIM.nomeNac(id)};
 SIM.OoNac=id=>{const s=SIM.oNac(id);return s[0].toUpperCase()+s.slice(1)};
@@ -98,8 +103,26 @@ SIM.novo=(jog)=>{S={v:20,dia:0,jog,eraMundo:0,nac:{},prov:[],guerra:{},ali:{},co
  // blindados na fronteira das potências
  for(let p=0;p<NP;p++){const pr=S.prov[p];const maj=MAIORES[pr.d];if(!maj||!SIM.nucleo(pr.d,p))continue;if(P[p].a.some(q=>S.prov[q].d!==pr.d)&&rnd()<.5)pr.b+=1}
  for(const [a,b] of ALIANCAS_1914)if(S.nac[a]&&S.nac[b]){S.ali[K(a,b)]=1;addRel(a,b,60)}
- N(jog).din+=150;N(jog).ref=0;
+ N(jog).din+=150;N(jog).ref=0;for(const id in S.nac)N(id).ini=cidadesDe(id).length;S.ameaca=0;
  noticia('28 de julho de 1914. A Europa está à beira da guerra.','era');return S};
+// ---------- impérios e ameaça
+const TIERS=[null,{n:'Reino',min:8,ref:2,renda:.10,ic:'🏰'},{n:'Império',min:25,ref:5,renda:.20,ic:'👑'},{n:'Superpotência',min:60,ref:10,renda:.35,ic:'🌍'}];SIM.TIERS=TIERS;
+const cresc=id=>{const n=N(id);return cidadesDe(id).length-(n.ini||0)};SIM.cresc=cresc;
+const precisa=(id,t)=>Math.max(TIERS[t].min,Math.ceil((N(id).ini||0)*[0,.12,.35,.7][t]));SIM.precisa=precisa;
+SIM.nomeComTier=(id,t)=>{const n=N(id);const o=n.tier;n.tier=t;const r=SIM.nomeNac(id);n.tier=o;return r};
+SIM.podeProclamar=(id=S.jog)=>{const n=N(id);const t=(n.tier||0)+1;if(t>=TIERS.length)return 0;return cresc(id)>=precisa(id,t)?t:0};
+SIM.proclamar=(id=S.jog)=>{const t=SIM.podeProclamar(id);if(!t)return null;const n=N(id);const antes=SIM.nomeNac(id);n.tier=t;const novo=SIM.nomeNac(id);
+ noticia(novo===antes?`${TIERS[t].ic} ${antes} agora é uma POTÊNCIA REGIONAL!`:`${TIERS[t].ic} ${antes} se proclama ${novo}!`,'imperio',[id]);
+ if(id===S.jog){S.ameaca=Math.min(100,(S.ameaca||0)+12);for(const o in S.nac)if(o!==id&&N(o).vivo&&cidadesDe(o).length>=10)addRel(o,id,-8)}return {t,antes,novo}};
+function ameacaMensal(){const eu=S.jog;const n=N(eu);if(!n||!n.vivo)return;S.ameaca=Math.max(0,(S.ameaca||0)-2.5+(n.tier||0)*.6);const a=S.ameaca;S.amNiv=S.amNiv||0;
+ if(a>35){for(const o in S.nac){if(o===eu||!N(o).vivo||cidadesDe(o).length<8||aliado(o,eu))continue;addRel(o,eu,-(a-35)/15)}}
+ if(a>=40&&S.amNiv<1){S.amNiv=1;noticia(`👀 As potências se preocupam com o crescimento ${SIM.deNac(eu)}.`,'ameaca',[eu])}
+ if(a<25&&S.amNiv>=1)S.amNiv=0;
+ if(a>=70&&rnd()<.35&&(S.coalDia||-999)<S.dia-240){const pot=Object.keys(S.nac).filter(o=>o!==eu&&N(o).vivo&&!aliado(o,eu)&&cidadesDe(o).length>=12).sort((x,y)=>poder(y)-poder(x)).slice(0,4);if(pot.length>=2){S.coalDia=S.dia;S.amNiv=2;
+  for(let i=0;i<pot.length;i++)for(let j=i+1;j<pot.length;j++)if(!emGuerra(pot[i],pot[j])&&!aliado(pot[i],pot[j])){S.ali[K(pot[i],pot[j])]=1;addRel(pot[i],pot[j],20)}
+  const lst=pot.map(o=>SIM.oNac(o)).join(', ').replace(/, ([^,]*)$/,' e $1');noticia(`⚔️ COALIZÃO! ${lst[0].toUpperCase()+lst.slice(1)} se unem contra ${SIM.oNac(eu)}.`,'ameaca',[eu].concat(pot));
+  if(a>=82){const vz=new Set(vizinhosNac(eu));for(const o of pot)if(vz.has(o)&&!emGuerra(o,eu))declararGuerra(o,eu,`⚔️ ${SIM.OoNac(o)} ${V(o,'declara','declaram')} guerra ${SIM.aNac(eu)} para conter o seu império!`,false)}}}}
+SIM.ameacaTxt=a=>a>=70?'Alarmante':a>=40?'Alta':a>=20?'Média':'Baixa';
 // ---------- economia
 let comB={};const valorCom=(ra,rb)=>Math.round((2+Math.min(18,.12*Math.min(ra,rb)))*10)/10;
 const temCom=(a,b)=>!!S.com[K(a,b)];SIM.temCom=temCom;
@@ -112,25 +135,28 @@ SIM.fazerCom=fazerCom;
 function diario(){const d=Math.round(S.dia);const ag={};for(const id in S.nac)ag[id]={r:0,p:.1,m:0,c:0,cn:0};
  for(let i=0;i<NP;i++){const pr=S.prov[i];const a=ag[pr.d];if(!a)continue;a.c++;if(SIM.nucleo(pr.d,i))a.cn++;a.r+=P[i].renda*(1+.5*pr.fab)*(SIM.nucleo(pr.d,i)?1:.15);if(P[i].oil)a.p+=.7;a.m+=pr.i*TIPOS.i.man+pr.b*TIPOS.b.man+pr.a*TIPOS.a.man}
  comB={};for(const k in S.com){const [x,y]=k.split('|');if(!ag[x]||!ag[y]||!ag[x].c||!ag[y].c){delete S.com[k];continue}const v=valorCom(ag[x].r,ag[y].r);for(const [u,o] of [[x,y],[y,x]]){const b=comB[u]||(comB[u]={din:0,pet:0});b.din+=v;b.pet+=ag[o].p>.5?.2:.08}}
+ for(const id in ag){const t=N(id)&&N(id).tier;if(t)ag[id].r*=1+TIERS[t].renda}
  for(const id in comB){if(ag[id]){ag[id].r+=comB[id].din;ag[id].p+=comB[id].pet}}
  for(const id in S.nac){const n=N(id);if(!n.vivo)continue;const a=ag[id];if(!a.c){continue}n.din+=a.r-a.m;n.pet+=a.p;if(n.din<-50){n.din=-50;const cs=cidadesDe(id).filter(p=>S.prov[p].i>1);if(cs.length){S.prov[cs[(rnd()*cs.length)|0]].i--}}}
- if(d%30===0){for(const id in S.nac){const n=N(id);if(!n.vivo)continue;const c=ag[id].c;if(!c)continue;const cn=ag[id].cn;let r=Math.max(2,Math.floor((cn+(c-cn)/10)/3))+(S.prov[n.cap]&&S.prov[n.cap].d===id?2:0);if(id===S.jog){n.ref+=r;if(SIM.onReforco)SIM.onReforco(r)}else colocarIA(id,r)}
+ if(d%30===0){for(const id in S.nac){const n=N(id);if(!n.vivo)continue;const c=ag[id].c;if(!c)continue;const cn=ag[id].cn;let r=Math.max(2,Math.floor((cn+(c-cn)/10)/3))+(S.prov[n.cap]&&S.prov[n.cap].d===id?2:0)+(n.tier?TIERS[n.tier].ref:0);if(id===S.jog){n.ref+=r;if(SIM.onReforco)SIM.onReforco(r)}else colocarIA(id,r)}
   revoltas()}
  // eventos históricos de 1914
  while(S.ev<EVENTOS_1914.length&&EVENTOS_1914[S.ev].d<=d){const ev=EVENTOS_1914[S.ev++];if(S.eraMundo>0)continue;const a=ev.a,b=ev.b;if(!N(a)||!N(b)||!N(a).vivo||!N(b).vivo)continue;
   if(a===S.jog){if(ev.t==='alianca')S.prop.push({de:b,tipo:'ali',txt:'📜 Na história real: '+ev.txt+' Aceitar a aliança?'});else if(!emGuerra(a,b))S.prop.push({de:b,tipo:'hist',txt:'📜 Na história real: '+ev.txt+' Quer seguir a história e declarar guerra '+SIM.aNac(b)+'?'});continue}
   if(ev.t==='alianca')aliar(a,b,ev.txt);else{if(ev.t==='traicao')delete S.ali[K(a,b)];declararGuerra(a,b,ev.txt)}}
+ if(d%30===15){ajudaAliados();ajudaInimigos();ameacaMensal()}
  for(const id in S.nac){const n=N(id);if(!n.vivo||id===S.jog)continue;if((d+n.vez)%5===0)iaTurno(id);if((d+n.vez*6)%30===0)iaDiplo(id)}
  for(let e=S.eraMundo+1;e<4;e++)if(d>=DIA_ERA[e]){eventoEra(e);break}
  if(d>=DIA_FIM&&SIM.onFim)SIM.onFim()}
-SIM.rendaDia=id=>{let r=0,pe=.1,m=0;for(let i=0;i<NP;i++){const pr=S.prov[i];if(pr.d!==id)continue;r+=P[i].renda*(1+.5*pr.fab)*(SIM.nucleo(id,i)?1:.15);if(P[i].oil)pe+=.7;m+=pr.i*TIPOS.i.man+pr.b*TIPOS.b.man+pr.a*TIPOS.a.man}const cb=comB[id]||{din:0,pet:0};r+=cb.din;pe+=cb.pet;return {din:r-m,bruto:r,pet:pe,man:m,com:cb}};
+SIM.rendaDia=id=>{let r=0,pe=.1,m=0;for(let i=0;i<NP;i++){const pr=S.prov[i];if(pr.d!==id)continue;r+=P[i].renda*(1+.5*pr.fab)*(SIM.nucleo(id,i)?1:.15);if(P[i].oil)pe+=.7;m+=pr.i*TIPOS.i.man+pr.b*TIPOS.b.man+pr.a*TIPOS.a.man}const tt=N(id)&&N(id).tier;if(tt)r*=1+TIERS[tt].renda;const cb=comB[id]||{din:0,pet:0};r+=cb.din;pe+=cb.pet;return {din:r-m,bruto:r,pet:pe,man:m,com:cb}};
 SIM.passo=(dias)=>{if(!S)return;S.dia+=dias;while(S.ultDia<Math.floor(S.dia)){S.ultDia++;diario()}};
 // ---------- ações
 function pagar(n,c){if(n.din<c.din||n.pet<(c.pet||0))return false;n.din-=c.din;n.pet-=(c.pet||0);return true}
 SIM.custoTropa=k=>TIPOS[k].custo;
 SIM.recrutar=(p,k,q=1,id=S.jog)=>{const pr=S.prov[p];if(pr.d!==id)return 'Essa cidade não é sua.';const n=N(id);const c=TIPOS[k].custo;let feitos=0;for(let j=0;j<q;j++){if(!pagar(n,c))break;pr[k]++;feitos++}if(!feitos)return c.pet&&n.pet<c.pet?'Falta petróleo.':'Falta dinheiro.';if(id===S.jog)S.stats.rec+=feitos;return 'ok'};
 SIM.colocarReforcos=(p)=>{const n=N(S.jog);const pr=S.prov[p];if(pr.d!==S.jog||n.ref<=0)return 0;const r=n.ref;pr.i+=r;n.ref=0;S.stats.ref=(S.stats.ref||0)+r;return r};
-SIM.mover=(de,para,frac=1,id=S.jog)=>{if(S.prov[de].d!==id||S.prov[para].d!==id||!viz(de).includes(para))return null;const t=separar(de,frac);const tot=t.i+t.b+t.a;if(!tot)return null;for(const k of TK){S.prov[de][k]-=t[k];S.prov[para][k]+=t[k]}if(id===S.jog)S.stats.mov++;return t};
+SIM.alcancaveis=(de,id=S.jog)=>{const dist=new Map([[de,0]]);const q=[de];while(q.length){const x=q.shift();for(const y of viz(x))if(S.prov[y].d===id&&!dist.has(y)){dist.set(y,dist.get(x)+1);q.push(y)}}dist.delete(de);return dist};
+SIM.mover=(de,para,frac=1,id=S.jog)=>{if(de===para||S.prov[de].d!==id||S.prov[para].d!==id)return null;if(!viz(de).includes(para)&&!SIM.alcancaveis(de,id).has(para))return null;let t;if(typeof frac==='object'){const pr=S.prov[de];t={};for(const k of TK)t[k]=Math.max(0,Math.min(pr[k],frac[k]|0));if(SIM.total(pr)-(t.i+t.b+t.a)<1){if(t.i>0)t.i--;else if(t.b>0)t.b--;else if(t.a>0)t.a--}}else t=separar(de,frac);const tot=t.i+t.b+t.a;if(!tot)return null;for(const k of TK){S.prov[de][k]-=t[k];S.prov[para][k]+=t[k]}if(id===S.jog)S.stats.mov++;return t};
 const PREDIOS2={fab:{n:'Fábrica',d:'+50% de dinheiro nesta cidade',c:l=>({din:220*(l+1),pet:0}),max:2},fort:{n:'Fortaleza',d:'+40% de defesa nesta cidade',c:l=>({din:140*(l+1),pet:0}),max:2}};SIM.PREDIOS=PREDIOS2;
 SIM.construir=(p,k,id=S.jog)=>{const pr=S.prov[p];const B=PREDIOS2[k];if(pr.d!==id)return 'Essa cidade não é sua.';if(pr[k]>=B.max)return 'Nível máximo.';if(!pagar(N(id),B.c(pr[k])))return 'Falta dinheiro.';pr[k]++;if(id===S.jog)S.stats.cons++;return 'ok'};
 // pesquisa: 3 melhorias por era + avançar de era
@@ -158,8 +184,9 @@ SIM.executarAtaque=(pr)=>{const id=pr.id,alvo=pr.alvo,dono=S.prov[alvo].d;if(don
   const volta={};for(const k of TK)volta[k]=pr.t[k]-pa[k];const f0=pr.fontes[0];if(f0&&S.prov[f0.p].d===id)for(const k of TK)S.prov[f0.p][k]+=volta[k]}
  const r={id,dono,alvo,vit,chance:ch,A,D,env:pr.t,pa,pd,de:pr.fontes.map(f=>f.p)};
  if(id===S.jog){vit?S.stats.vit++:S.stats.der++}
+ else if(N(S.jog)&&aliado(id,S.jog)&&emGuerra(dono,S.jog)){noticia(`🤝 Aliado: ${SIM.OoNac(id)} ${V(id,'atacou','atacaram')} ${P[alvo].n} (${SIM.oNac(dono)}) — ${vit?'e conquistou a cidade!':'mas foi repelido.'}`,vit?'aliado_vit':'aliado',[id,S.jog])}
  if(SIM.onBatalha)SIM.onBatalha(r);return r};
-function conquistar(p,id){const pr=S.prov[p];const antigo=pr.d;pr.d=id;pr.fort=Math.max(0,pr.fort-1);pr.oc=SIM.nucleo(id,p)?0:1;for(const k of TK)pr[k]=0;
+function conquistar(p,id){const pr=S.prov[p];const antigo=pr.d;if(id===S.jog&&S.dia>0)S.ameaca=Math.min(100,(S.ameaca||0)+(SIM.ehCapital(p)?7:2.2));pr.d=id;pr.fort=Math.max(0,pr.fort-1);pr.oc=SIM.nucleo(id,p)?0:1;for(const k of TK)pr[k]=0;
  if(id===S.jog)S.stats.conq++;if(antigo===S.jog)S.stats.perd++;
  const na=N(antigo);if(id===S.jog&&na&&na.cap===p)S.stats.caps=(S.stats.caps||0)+1;if(na&&na.cap===p){const resto=cidadesDe(antigo);if(resto.length){na.cap=resto.sort((a,b)=>P[b].pop-P[a].pop)[0];noticia(`${SIM.OoNac(id)} ${V(id,'toma','tomam')} ${P[p].n}, a capital ${SIM.deNac(antigo)}!`,'conquista',[id,antigo])}}
  if(na&&!cidadesDe(antigo).length){na.vivo=false;for(const k in S.guerra)if(k.split('|').includes(antigo))delete S.guerra[k];for(const k in S.ali)if(k.split('|').includes(antigo))delete S.ali[k];noticia(`${SIM.OoNac(antigo)} ${V(antigo,'foi','foram')} derrotad${({a:'a',as:'as',os:'os'})[artigo(antigo)]||'o'} e ${V(antigo,'deixou','deixaram')} de existir.`,'conquista',[id,antigo]);if(antigo===S.jog&&SIM.onDerrota)SIM.onDerrota()}
@@ -168,8 +195,29 @@ SIM.conquistar=conquistar;
 // ---------- diplomacia
 function declararGuerra(a,b,txt,cadeia=true){if(a===b||emGuerra(a,b)||!N(a)||!N(b)||!N(a).vivo||!N(b).vivo)return;delete S.ali[K(a,b)];if(S.com[K(a,b)]){delete S.com[K(a,b)];noticia(`A guerra encerra o acordo comercial entre ${SIM.oNac(a)} e ${SIM.oNac(b)}.`,'info',[a,b])}S.guerra[K(a,b)]=1;S.inicioG[K(a,b)]={dia:S.dia,ca:cidadesDe(a).length,cb:cidadesDe(b).length};addRel(a,b,-60);
  noticia(txt||`${SIM.OoNac(a)} ${V(a,'declara','declaram')} guerra ${SIM.aNac(b)}!`,'guerra',[a,b]);if(SIM.onGuerra)SIM.onGuerra(a,b);
+ if(cadeia&&a===S.jog){for(const id of aliadosDe(a)){if(id===b||emGuerra(id,b)||aliado(id,b))continue;const pp=PERSONAS[N(id).persona];const ch=.45+rel(id,a)/200+(pp.trai<.3?.15:0);if(rnd()<ch)aliadoEntra(id,b);else noticia(`${SIM.OoNac(id)} ${V(id,'preferiu','preferiram')} ficar fora da sua guerra contra ${SIM.oNac(b)}. Use "Pedir ajuda" na Diplomacia.`,'info',[id,a])}}
+ if(cadeia&&b===S.jog){for(const id of aliadosDe(b)){if(id===a||emGuerra(id,a)||aliado(id,a))continue;const pp=PERSONAS[N(id).persona];if(rnd()<(pp.trai>1?.5:.92))aliadoEntra(id,a)}}
  if(cadeia){for(const id in S.nac){if(id===a||id===b||!N(id).vivo)continue;if(aliado(id,b)&&!aliado(id,a)&&!emGuerra(id,a)){if(id===S.jog){S.prop.push({de:b,tipo:'ajuda',inim:a,txt:`${SIM.OoNac(b)} (sua aliança) ${V(b,'foi atacado','foram atacados')}${artigo(b)==='a'?'a':''} por ${SIM.oNac(a)}. Entrar na guerra para defendê-la?`});continue}
-  const near=N(id).cont===N(a).cont||vizinhosNac(id).includes(a);const pp=PERSONAS[N(id).persona];if(near&&rnd()<(pp.trai>1?.35:pp.trai>.5?.7:.95))declararGuerra(id,a,`${SIM.OoNac(id)} ${V(id,'entra','entram')} na guerra para defender ${SIM.oNac(b)}.`,false)}}}}
+  const near=N(id).cont===N(a).cont||vizinhosNac(id).includes(a);const pp=PERSONAS[N(id).persona];if(near&&rnd()<(pp.trai>1?.35:pp.trai>.5?.7:.95))declararGuerra(id,a,a===S.jog?`⚠️ ${SIM.OoNac(id)} ${V(id,'entrou','entraram')} na guerra CONTRA VOCÊ para defender ${SIM.oNac(b)}!`:`${SIM.OoNac(id)} ${V(id,'entra','entram')} na guerra para defender ${SIM.oNac(b)}.`,false)}}}}
+function aliadoEntra(id,inim){declararGuerra(id,inim,`🤝 ${SIM.OoNac(id)} ${V(id,'entrou','entraram')} na guerra ao seu lado contra ${SIM.oNac(inim)}!`,false);S.ajudaDia=S.ajudaDia||{};S.ajudaDia[id]=S.dia}
+SIM.pedirAjuda=(id)=>{const eu=S.jog;if(!aliado(id,eu))return {ok:false,txt:'Só aliados podem ajudar.'};const ws=guerrasDe(eu).filter(w=>!emGuerra(id,w)&&!aliado(id,w)&&N(w)&&N(w).vivo);if(!ws.length)return {ok:false,txt:guerrasDe(eu).length?`${SIM.OoNac(id)} já ${V(id,'está','estão')} lutando ao seu lado.`:'Você não está em guerra.'};
+ S.pedido=S.pedido||{};if((S.pedido[id]||-999)>S.dia-45)return {ok:false,txt:`Você já pediu ajuda ${SIM.aNac(id)} há pouco tempo. Espere uns dias.`};S.pedido[id]=S.dia;
+ const pp=PERSONAS[N(id).persona];const sc=rel(id,eu)/60+.45-(guerrasDe(id).length*.25)+(pp.trai<.3?.25:0)-(pp.trai>.6?.3:0)+(rnd()-.5)*.5;
+ if(sc>0){for(const w of ws)aliadoEntra(id,w);return {ok:true,txt:`${SIM.OoNac(id)} ${V(id,'aceitou','aceitaram')} e ${V(id,'entrou','entraram')} na guerra ao seu lado!`}}addRel(id,eu,-3);return {ok:false,txt:`${SIM.OoNac(id)} ${V(id,'recusou','recusaram')} entrar na guerra agora. Melhore as relações (acordo comercial ajuda).`}};
+SIM.precisaAjuda=id=>aliado(id,S.jog)&&guerrasDe(S.jog).some(w=>!emGuerra(id,w)&&!aliado(id,w));
+// aliados mandam tropas para a fronteira do jogador
+function ajudaAliados(){const eu=S.jog;if(!N(eu)||!N(eu).vivo)return;const ws=new Set(guerrasDe(eu));if(!ws.size)return;
+ for(const id of aliadosDe(eu)){if(!guerrasDe(id).some(w=>ws.has(w)))continue;if(rnd()>.5)continue;const meus=cidadesDe(id);if(meus.length<3)continue;
+  const front=cidadesDe(eu).filter(p=>viz(p).some(q=>ws.has(S.prov[q].d)&&emGuerra(id,S.prov[q].d)));if(!front.length)continue;front.sort((x,y)=>ameaca(y,eu)-ameaca(x,eu));
+  const doador=meus.filter(p=>!viz(p).some(q=>emGuerra(id,S.prov[q].d))&&S.prov[p].i>3).sort((x,y)=>S.prov[y].i-S.prov[x].i)[0];if(doador==null)continue;
+  const q=Math.max(1,Math.min(S.prov[doador].i-2,Math.round(1+Math.sqrt(meus.length)/2)));S.prov[doador].i-=q;const alvo=front[0];S.prov[alvo].i+=q;S.vol=S.vol||{};S.vol[alvo]=(S.vol[alvo]||0)+q;
+  noticia(`🤝 ${SIM.OoNac(id)} ${V(id,'enviou','enviaram')} ${q} ${q>1?'tropas':'tropa'} para defender ${P[alvo].n}.`,'alianca',[id,eu]);if(SIM.onAjuda)SIM.onAjuda(id,alvo,q)}}
+function ajudaInimigos(){const eu=S.jog;if(!N(eu)||!N(eu).vivo)return;const ws=guerrasDe(eu);
+ for(const w of ws){for(const id of aliadosDe(w)){if(id===eu||!emGuerra(id,eu)||rnd()>.45)continue;const meus=cidadesDe(id);if(meus.length<3)continue;
+  const front=cidadesDe(w).filter(p=>viz(p).some(q=>S.prov[q].d===eu));if(!front.length)continue;front.sort((x,y)=>ameaca(y,w)-ameaca(x,w));
+  const doador=meus.filter(p=>!viz(p).some(q=>emGuerra(id,S.prov[q].d))&&S.prov[p].i>3).sort((x,y)=>S.prov[y].i-S.prov[x].i)[0];if(doador==null)continue;
+  const q=Math.max(1,Math.min(S.prov[doador].i-2,Math.round(1+Math.sqrt(meus.length)/2)));S.prov[doador].i-=q;S.prov[front[0]].i+=q;
+  noticia(`⚠️ ${SIM.OoNac(id)} ${V(id,'enviou','enviaram')} ${q} ${q>1?'tropas':'tropa'} para ajudar ${SIM.oNac(w)} em ${P[front[0]].n}.`,'guerra',[id,eu])}}}
 function fazerPaz(a,b,txt){if(!emGuerra(a,b))return;delete S.guerra[K(a,b)];S.treg[K(a,b)]=S.dia+120;addRel(a,b,25);noticia(txt||`Paz assinada entre ${SIM.oNac(a)} e ${SIM.oNac(b)}.`,'paz',[a,b]);if(SIM.onPaz)SIM.onPaz(a,b)}
 function aliar(a,b,txt){if(a===b||aliado(a,b)||emGuerra(a,b))return;S.ali[K(a,b)]=1;addRel(a,b,30);noticia(txt||`${SIM.OoNac(a)} e ${SIM.oNac(b)} formam uma aliança.`,'alianca',[a,b])}
 SIM.declararGuerra=declararGuerra;SIM.fazerPaz=fazerPaz;SIM.aliar=aliar;
@@ -180,9 +228,9 @@ SIM.propor=(tipo,id)=>{const eu=S.jog;const n=N(id);if(!n||!n.vivo)return {ok:fa
  if(tipo==='guerra'){if(aliado(eu,id))delete S.ali[K(eu,id)];declararGuerra(eu,id,`${SIM.OoNac(eu)} ${V(eu,'declara','declaram')} guerra ${SIM.aNac(id)}!`);return {ok:true,txt:'Guerra declarada!'}}
  if(tipo==='paz'){if(!emGuerra(eu,id))return {ok:false,txt:'Vocês não estão em guerra.'};const pp=PERSONAS[n.persona];const g=S.inicioG[K(eu,id)]||{dia:S.dia};const tempo=(S.dia-g.dia)/365;const sc=perdendo(id,eu)*2-perdendo(eu,id)+tempo*.25+pp.paz*.2-.35+rel(eu,id)/200;
   if(sc>0||rnd()<.1){fazerPaz(eu,id);return {ok:true,txt:`${SIM.OoNac(id)} ${V(id,'aceitou','aceitaram')} a paz!`}}addRel(eu,id,-3);return {ok:false,txt:`${SIM.OoNac(id)} ${V(id,'recusou','recusaram')} a paz. Conquiste mais cidades para forçar um acordo.`}}
- if(tipo==='alianca'){if(emGuerra(eu,id))return {ok:false,txt:'Faça a paz primeiro.'};if(aliado(eu,id))return {ok:false,txt:'Vocês já são aliados.'};const comum=guerrasDe(eu).some(x=>emGuerra(id,x));const sc=rel(eu,id)/40+(comum?1.2:0)+(n.persona==='leal'?.3:0)-(aliadosDe(id).length>=4?2:0)-.6+(rnd()-.5)*.6;
+ if(tipo==='alianca'){if(emGuerra(eu,id))return {ok:false,txt:'Faça a paz primeiro.'};if(aliado(eu,id))return {ok:false,txt:'Vocês já são aliados.'};const comum=guerrasDe(eu).some(x=>emGuerra(id,x));const sc=rel(eu,id)/40+(comum?1.2:0)+(n.persona==='leal'?.3:0)-(aliadosDe(id).length>=4?2:0)-Math.max(0,(S.ameaca||0)-30)/35-.6+(rnd()-.5)*.6;
   if(sc>0){aliar(eu,id);return {ok:true,txt:`${SIM.OoNac(id)} ${V(id,'aceitou','aceitaram')} a aliança!`}}addRel(eu,id,2);return {ok:false,txt:`${SIM.OoNac(id)} ${V(id,'recusou','recusaram')} a aliança por enquanto. Ter um inimigo em comum ajuda.`}}
- if(tipo==='comercio'){if(emGuerra(eu,id))return {ok:false,txt:'Faça a paz primeiro.'};if(temCom(eu,id))return {ok:false,txt:'Vocês já têm um acordo comercial.'};if(comerciosDe(eu).length>=6)return {ok:false,txt:'Você já tem 6 acordos comerciais (o máximo).'};const sc=rel(eu,id)/40+.55+(aliado(eu,id)?.6:0)-(comerciosDe(id).length>=5?1.2:0)+(n.persona==='agressivo'?-.25:0)+(rnd()-.5)*.7;
+ if(tipo==='comercio'){if(emGuerra(eu,id))return {ok:false,txt:'Faça a paz primeiro.'};if(temCom(eu,id))return {ok:false,txt:'Vocês já têm um acordo comercial.'};if(comerciosDe(eu).length>=6)return {ok:false,txt:'Você já tem 6 acordos comerciais (o máximo).'};const sc=rel(eu,id)/40+.55-Math.max(0,(S.ameaca||0)-30)/40+(aliado(eu,id)?.6:0)-(comerciosDe(id).length>=5?1.2:0)+(n.persona==='agressivo'?-.25:0)+(rnd()-.5)*.7;
   if(sc>0){fazerCom(eu,id);return {ok:true,txt:`${SIM.OoNac(id)} ${V(id,'aceitou','aceitaram')} o acordo comercial! +${SIM.valorComCom(eu,id)} de dinheiro por dia para os dois.`}}addRel(eu,id,1);return {ok:false,txt:`${SIM.OoNac(id)} ${V(id,'recusou','recusaram')} o acordo comercial. Melhore as relações e tente de novo.`}}
  if(tipo==='cancelarcom'){cancelarCom(eu,id);return {ok:true,txt:'Acordo comercial cancelado.'}}
  if(tipo==='romper'){delete S.ali[K(eu,id)];addRel(eu,id,-30);noticia(`${SIM.OoNac(eu)} ${V(eu,'rompe','rompem')} a aliança com ${SIM.oNac(id)}.`,'traicao',[eu,id]);return {ok:true,txt:'Aliança rompida.'}}};
@@ -235,9 +283,9 @@ function iaTurno(id){const n=N(id);const cs=cidadesDe(id);if(!cs.length)return;c
  if(front.length&&n.din>300&&rnd()<.08){const c=front[(rnd()*front.length)|0];if(S.prov[c].fort<2)SIM.construir(c,'fort',id)}
  if(n.din>600&&rnd()<.12){const op=PESQ.filter(z=>z.era<=n.era&&!n.pq[z.id]);if(op.length)SIM.pesquisar(op[(rnd()*op.length)|0].id,id)}
  // atacar
- if(inim.size){const lim=LIM[n.persona]||.62;let ataques=0;const ordem=front.slice().sort(()=>rnd()-.5);
+ if(inim.size){const aliadoJ=N(S.jog)&&aliado(id,S.jog);const lim=LIM[n.persona]||.62;let ataques=0;const ordem=front.slice().sort(()=>rnd()-.5);
   for(const p of ordem){if(ataques>=2)break;if(S.prov[p].d!==id||SIM.total(S.prov[p])<2)continue;let melhor=null,mc=0;
-   for(const q of viz(p)){if(!inim.has(S.prov[q].d))continue;const pr=SIM.prepararAtaque([p],q,.7,id);const bon=(SIM.ehCapital(q)?.05:0)+(SIM.nucleo(id,q)?.06:0);if(pr.chance+bon>mc){mc=pr.chance+bon;melhor=pr}}
+   for(const q of viz(p)){if(!inim.has(S.prov[q].d))continue;const pr=SIM.prepararAtaque([p],q,.7,id);const bon=(SIM.ehCapital(q)?.05:0)+(SIM.nucleo(id,q)?.06:0)+(aliadoJ&&emGuerra(S.prov[q].d,S.jog)?.12:0);if(pr.chance+bon>mc){mc=pr.chance+bon;melhor=pr}}
    if(melhor&&mc>lim+(S.eraMundo===0?.08:0)){SIM.executarAtaque(melhor);ataques++}}}
  // mover tropas do interior para a frente
  if(front.length||true){const alvoSet=new Set(front.length?front:cs.filter(p=>viz(p).some(q=>S.prov[q].d!==id&&!aliado(S.prov[q].d,id))));if(!alvoSet.size)return;
@@ -249,6 +297,7 @@ function iaDiplo(id){const n=N(id);const pp=PERSONAS[n.persona]||PERSONAS.defens
   if(o===S.jog){if(!S.prop.some(x=>x.de===id&&x.tipo==='paz'))S.prop.push({de:id,tipo:'paz',txt:ruim>.3?`${SIM.OoNac(id)} ${V(id,'está','estão')} perdendo e ${V(id,'pede','pedem')} PAZ. Aceitar?`:`${SIM.OoNac(id)} ${V(id,'propõe','propõem')} um tratado de paz. Aceitar?`})}
   else{const ruimO=perdendo(o,id);if(ruimO>-.2&&rnd()<.6)fazerPaz(id,o)}}}
  if(id===S.jog)return;
+ if(SIM.podeProclamar(id)&&rnd()<.5)SIM.proclamar(id);
  // guerra
  if(ws.length<2&&cidadesDe(id).length>=4&&rnd()<.06*pp.guerra*(S.eraMundo===0&&S.dia<500?.3:1)){const vz=vizinhosNac(id).filter(v=>!aliado(v,id)&&!emGuerra(v,id)&&!(S.treg[K(id,v)]>S.dia));let alvo=null,ra=1e9;for(const v of vz){const r=poder(v)/Math.max(1,meuP);if(r<ra){ra=r;alvo=v}}
   if(alvo&&ra<.45){if(alvo===S.jog&&S.dia<365)return;declararGuerra(id,alvo,`${SIM.OoNac(id)} ${V(id,'declara','declaram')} guerra ${SIM.aNac(alvo)}!`)}}
@@ -271,5 +320,5 @@ function iaDiplo(id){const n=N(id);const pp=PERSONAS[n.persona]||PERSONAS.defens
 SIM.iaTurno=iaTurno;
 // ---------- salvar
 SIM.exportar=()=>JSON.stringify(S);
-SIM.carregar=txt=>{const o=JSON.parse(txt);if(!o||o.v!==20)return false;S=o;S.com=S.com||{};return true};
+SIM.carregar=txt=>{const o=JSON.parse(txt);if(!o||o.v!==20)return false;S=o;S.com=S.com||{};if(S.ameaca==null)S.ameaca=0;for(const id in S.nac)if(N(id).ini==null)N(id).ini=cidadesDe(id).length;return true};
 })();

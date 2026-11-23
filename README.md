@@ -9,7 +9,7 @@ com uma campanha histórica no **mapa-múndi real**: 1ª Guerra (1914) → 2ª G
 ## Como jogar
 - Cada cidade mostra quantas tropas tem.
 - Toque numa cidade sua e depois numa cidade **vermelha** vizinha → **ATACAR**. O jogo mostra sua força, a defesa e a chance de vitória.
-- Toque numa cidade **verde** (sua) para **mover tropas**.
+- **Mover tropas:** toque numa cidade sua → botão **🚚 Mover tropas** → toque em qualquer cidade sua ligada pelo seu território (ou toque direto numa cidade verde). Escolha quantas com a barra, +/−, Metade ou Todas.
 - Todo mês chegam **reforços**: toque no botão 🎖️ e coloque-os nas suas cidades.
 - Recrute com um botão: Infantaria, Blindados e Aviação (melhoram sozinhos a cada era).
 - Construções simples: Fábrica (mais dinheiro) e Fortaleza (mais defesa).
@@ -18,3 +18,9 @@ com uma campanha histórica no **mapa-múndi real**: 1ª Guerra (1914) → 2ª G
 - Missões guiadas com seta no mapa e jornal com as notícias da guerra.
 
 Tudo em JavaScript puro + Canvas, sem servidor. Salva no próprio navegador.
+
+## Novidades v4
+- Aliados entram na guerra ao seu lado, atacam os inimigos em comum e mandam tropas para as suas fronteiras. Botão **🆘 Pedir ajuda** na Diplomacia.
+- Os aliados dos seus inimigos também entram contra você e mandam reforços.
+- **Proclamar Império:** conquiste cidades para subir de nível (Reino → Império → Superpotência), com cerimônia, novo nome e bônus de reforços e dinheiro. A IA também vira império.
+- **Ameaça:** quanto mais você cresce, mais as potências desconfiam; com ameaça alta formam coalizões contra você.
