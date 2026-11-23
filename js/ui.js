@@ -1,7 +1,7 @@
 // Interface: telas, HUD, toque no mapa, ataque, resultado, missões, painéis
 'use strict';
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const SAVE='guerras_mundiais_v2';const VEL=[0,3,9];
+const SAVE='guerras_mundiais_v2';const VEL=[0,.8,2.5,7];
 let S=null,vel=1,demo=true,sel=null,modo=null,painelAtual=null,animando=false,lidas=0,atqEst=null;
 const P=SIM.P;const TK=['i','b','a'];const TI={i:'inf',b:'tan',a:'avi'};
 const fmt=n=>{n=Math.floor(n);return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e4?(n/1e3).toFixed(n>=1e5?0:1)+'k':String(n)};
@@ -161,13 +161,14 @@ function resultado(r){const e=eraDe(S.jog);const pa=r.pa.i+r.pa.b+r.pa.a,pd=r.pd
  el.querySelector('[data-ok]').onclick=()=>{el.classList.add('oculto');if(r.vit&&S.prov[r.alvo].d===S.jog)selecionar(r.alvo);else if(r.de[0]!=null&&S.prov[r.de[0]].d===S.jog)selecionar(r.de[0])}}
 // ---------- diplomacia
 function diploBts(d){if(d===S.jog||!S.nac[d])return '';const g=SIM.emGuerra(d,S.jog),a=SIM.aliado(d,S.jog);
- return g?`<button class="bt" data-dip="paz" data-n="${d}">🕊️ Propor paz</button>`:a?`<button class="bt" data-dip="romper" data-n="${d}">Romper aliança</button>`:`<button class="bt" data-dip="alianca" data-n="${d}">🤝 Propor aliança</button><button class="bt perigo" data-dip="guerra" data-n="${d}">⚔️ Declarar guerra</button>`}
+ const c=SIM.temCom(d,S.jog);const com=g?'':c?`<button class="bt bt-com off" data-dip="cancelarcom" data-n="${d}">💔 Cancelar acordo</button>`:`<button class="bt bt-com" data-dip="comercio" data-n="${d}">💰 Acordo comercial</button>`;
+ return g?`<button class="bt" data-dip="paz" data-n="${d}">🕊️ Propor paz</button>`:a?`${com}<button class="bt" data-dip="romper" data-n="${d}">Romper aliança</button>`:`<button class="bt" data-dip="alianca" data-n="${d}">🤝 Propor aliança</button>${com}<button class="bt perigo" data-dip="guerra" data-n="${d}">⚔️ Declarar guerra</button>`}
 function ligarDiplo(root){root.querySelectorAll('[data-dip]').forEach(b=>b.onclick=()=>{const t=b.dataset.dip,d=b.dataset.n;if(t==='guerra'){modal(`<h3>Declarar guerra?</h3><p>Você vai entrar em guerra contra ${SIM.oNac(d)}${SIM.aliadosDe(d).length?' e os aliados podem ajudar o inimigo':''}.</p><div class="acoes"><button class="bt" data-fechar>Cancelar</button><button class="bt perigo" id="mSim">Declarar guerra</button></div>`);$('#mSim').onclick=()=>{fecharModal();const r=SIM.propor('guerra',d);toast(r.txt,'guerra');MAPA.sujar();atualizar()};return}
  const r=SIM.propor(t,d);toast(r.txt,r.ok?'ok':'info');MAPA.sujar();atualizar()})}
 function atualizar(){if(sheetTipo)renderSheet();if(painelAtual)renderPainel();hud()}
 let propAberta=null;
-function proximaProposta(){if(propAberta||!S.prop.length||animando||(S.mis||0)<1)return;const pr=S.prop[0];if(!S.nac[pr.de]||!S.nac[pr.de].vivo){S.prop.shift();return}propAberta=pr;
- const tit={paz:'Proposta de paz',ali:'Proposta de aliança',hist:'Momento histórico',ajuda:'Pedido de ajuda'}[pr.tipo]||'Diplomacia';
+function proximaProposta(){if(propAberta&&$('#modal').classList.contains('oculto'))propAberta=null;if(propAberta||!S.prop.length||animando||(S.mis||0)<1)return;const pr=S.prop[0];if(!S.nac[pr.de]||!S.nac[pr.de].vivo){S.prop.shift();return}propAberta=pr;
+ const tit={paz:'Proposta de paz',ali:'Proposta de aliança',hist:'Momento histórico',ajuda:'Pedido de ajuda',com:'Acordo comercial'}[pr.tipo]||'Diplomacia';
  modal(`<div class="prop-cab">${band(pr.de)}<h3>${tit}</h3></div><p>${pr.txt}</p><div class="acoes"><button class="bt" id="pNao">${pr.tipo==='hist'?'Não, seguir em paz':'Recusar'}</button><button class="bt bt-ouro" id="pSim">${pr.tipo==='hist'?'Seguir a história':'Aceitar'}</button></div>`);
  $('#pSim').onclick=()=>{SIM.responder(pr,true);propAberta=null;fecharModal();MAPA.sujar();atualizar()};$('#pNao').onclick=()=>{SIM.responder(pr,false);propAberta=null;fecharModal();atualizar()}}
 // ---------- painéis
@@ -186,8 +187,10 @@ function renderPainel(){const p=painelAtual;const c=$('#painelC');const T={pesqu
   const be=c.querySelector('[data-era]');if(be)be.onclick=()=>{const r=SIM.avancarEra();if(r!=='ok'){toast(r);return}fecharPainel();MAPA.sujar()}}
  else if(p==='diplo'){const props=S.prop;const vivos=id=>S.nac[id]&&S.nac[id].vivo&&SIM.cidadesDe(id).length;const guerras=SIM.guerrasDe(S.jog).filter(vivos),alis=SIM.aliadosDe(S.jog).filter(vivos);const viz=SIM.vizinhosNac(S.jog).filter(x=>!guerras.includes(x)&&!alis.includes(x));
   const cont={};S.prov.forEach(q=>cont[q.d]=(cont[q.d]||0)+1);const grandes=Object.keys(S.nac).filter(id=>id!==S.jog&&vivos(id)&&!guerras.includes(id)&&!alis.includes(id)&&!viz.includes(id)).sort((a,b)=>(cont[b]||0)-(cont[a]||0)).slice(0,6);
-  const linha=id=>`<div class="nrow">${band(id)}<div class="nr-t"><b>${SIM.nomeNac(id)}</b><small>${cont[id]||0} cidades · ${PERSONAS[S.nac[id].persona].n}</small></div><div class="nr-b">${diploBts(id)}</div></div>`;
+  const relTxt=id=>{const r=SIM.rel(id,S.jog);return r>=40?'<i class="rb">ótima</i>':r>=10?'<i class="rb">boa</i>':r>-15?'neutra':r>-40?'<i class="rm">ruim</i>':'<i class="rm">péssima</i>'};const coms=SIM.comerciosDe(S.jog).filter(vivos);const bc=SIM.bonusCom(S.jog);
+  const linha=id=>`<div class="nrow">${band(id)}<div class="nr-t"><b>${SIM.nomeNac(id)}</b><small>${cont[id]||0} cidades · ${PERSONAS[S.nac[id].persona].n} · relação ${relTxt(id)}</small>${SIM.temCom(id,S.jog)?`<small class="tag-com">💰 Acordo comercial: +${SIM.valorComCom(id,S.jog)}/dia</small>`:''}</div><div class="nr-b">${diploBts(id)}</div></div>`;
   c.innerHTML=`${props.length?`<div class="sec">Propostas (${props.length})</div>${props.map((pr,i)=>`<div class="prop">${band(pr.de)}<p>${pr.txt}</p><div class="acoes"><button class="bt" data-pn="${i}">Recusar</button><button class="bt bt-ouro" data-ps="${i}">Aceitar</button></div></div>`).join('')}`:''}
+  <div class="com-box"><b>💰 Acordos comerciais (${coms.length}/6)</b><span>${coms.length?`Rendendo <b>+${bc.din.toFixed(0)}</b> de dinheiro e <b>+${bc.pet.toFixed(1)}</b> de petróleo por dia.`:'Feche acordos com países em paz: os dois ganham dinheiro e petróleo todo dia.'}</span>${coms.length?`<div class="com-l">${coms.map(id=>band(id)+' '+SIM.nomeNac(id)).join(' · ')}</div>`:''}</div>
   <div class="sec">Em guerra (${guerras.length})</div>${guerras.map(linha).join('')||'<p class="ajuda">Você está em paz com todos.</p>'}
   <div class="sec">Aliados (${alis.length})</div>${alis.map(linha).join('')||'<p class="ajuda">Nenhum aliado. Ter um inimigo em comum ajuda a fechar alianças.</p>'}
   <div class="sec">Vizinhos</div>${viz.map(linha).join('')||'<p class="ajuda">—</p>'}

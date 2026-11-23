@@ -337,3 +337,12 @@ img.flip{transform:scaleX(-1)}
 .acoes .bt-mov{background:linear-gradient(180deg,#5bf08a,#25a24a);color:#06200d;border-color:transparent}
 .acoes .perigo{background:rgba(255,60,60,.2);border-color:rgba(255,80,80,.5);color:#ffc2c2}
 #toasts{z-index:80;right:64px;left:8px;align-items:flex-start}
+.bt-com{background:linear-gradient(180deg,#3a3010,#2a2208);border-color:rgba(243,200,90,.55)!important;color:#ffd977}
+.bt-com.off{background:rgba(255,255,255,.06);color:#e9c6c6;border-color:rgba(255,120,120,.35)!important}
+.tag-com{display:block;color:#ffd977!important;font-weight:600}
+.nr-t i.rb{color:#6fe39a;font-style:normal}.nr-t i.rm{color:#ff8a7a;font-style:normal}
+.com-box{margin:10px 0 4px;padding:12px;border-radius:14px;background:linear-gradient(135deg,rgba(243,200,90,.16),rgba(243,200,90,.04));border:1px solid rgba(243,200,90,.35);display:flex;flex-direction:column;gap:4px;font-size:13px}
+.com-box b{color:#ffd977}.com-box span{color:#d8d2c0}.com-l{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:#eee}.com-l .band svg,.com-box .band{width:20px;height:13px;display:inline-block;vertical-align:middle}
+.vel button{min-width:34px}
+.vel button{min-width:28px;padding:8px 5px;font-size:10px}
+.nr-b .bt{flex:1 1 40%}.nr-b .perigo{flex:1 1 100%}

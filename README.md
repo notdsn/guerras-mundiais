@@ -14,7 +14,7 @@ com uma campanha histórica no **mapa-múndi real**: 1ª Guerra (1914) → 2ª G
 - Recrute com um botão: Infantaria, Blindados e Aviação (melhoram sozinhos a cada era).
 - Construções simples: Fábrica (mais dinheiro) e Fortaleza (mais defesa).
 - Pesquisa: 3 melhorias por era e o botão para avançar de era.
-- Diplomacia: paz, aliança, guerra. Países da IA fazem alianças, traem, sofrem revoltas.
+- Diplomacia: paz, aliança, **acordo comercial** (+dinheiro e petróleo por dia para os dois), guerra. A IA aceita, recusa, propõe e pode cancelar acordos ou romper alianças. Países da IA fazem alianças, traem, sofrem revoltas.
 - Missões guiadas com seta no mapa e jornal com as notícias da guerra.
 
 Tudo em JavaScript puro + Canvas, sem servidor. Salva no próprio navegador.
