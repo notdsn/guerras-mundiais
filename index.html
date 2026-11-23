@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f13">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Guerras Mundiais — 1914 até Hoje</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="mapa"></canvas>
+<div id="hud" class="oculto">
+  <div class="hud-l1">
+    <button id="hudNac" class="hud-nac"><span id="hudBand" class="band"></span><span><b id="hudNome">—</b><small id="hudEra">1ª GUERRA</small></span></button>
+    <div class="hud-data"><b id="hudData">28 jul 1914</b><small id="hudAno">dia 1</small></div>
+    <div id="vel" class="vel"><button data-v="0" title="Pausar">❚❚</button><button data-v="1" title="Normal">▶</button><button data-v="2" title="Rápido">▶▶</button><button data-v="3" title="Muito rápido">▶▶▶</button></div>
+  </div>
+  <div id="recursos" class="recursos"></div>
+</div>
+<div id="botoesMapa" class="oculto"><button id="zMais">+</button><button id="zMenos">−</button><button id="zCasa" title="Ir para a capital">★</button></div>
+<div id="dica" class="dica oculto"></div>
+<div id="sheet" class="sheet oculto"><div class="alca"></div><div id="sheetC"></div></div>
+<div id="painel" class="painel oculto"><div class="painel-top"><h2 id="painelT"></h2><button class="x" id="painelX">✕</button></div><div id="painelC" class="painel-c"></div></div>
+<nav id="nav" class="oculto">
+  <button data-p="mapa" class="ativo"><i data-ic="mapa"></i><span>Mapa</span></button>
+  <button data-p="exercitos"><i data-ic="exercito"></i><span>Exércitos</span></button>
+  <button data-p="pesquisa"><i data-ic="pesquisa"></i><span>Pesquisa</span></button>
+  <button data-p="diplo"><i data-ic="diplo"></i><span>Diplomacia</span><em id="bDiplo" class="badge oculto"></em></button>
+  <button data-p="noticias"><i data-ic="noticias"></i><span>Notícias</span><em id="bNews" class="badge oculto"></em></button>
+  <button data-p="menu"><i data-ic="menu"></i><span>Menu</span></button>
+</nav>
+<div id="toasts"></div>
+<div id="modal" class="modal oculto"><div class="modal-c" id="modalC"></div></div>
+<div id="cine" class="cine oculto"></div>
+<div id="tut" class="tut oculto"><div id="tutFoco" class="tut-foco"></div><div id="tutCaixa" class="tut-caixa"></div></div>
+<div id="inicio" class="inicio">
+  <div class="inicio-fundo"></div>
+  <div class="inicio-c">
+    <div class="logo"><small>CAMPANHA MUNDIAL</small><h1>GUERRAS<br>MUNDIAIS</h1><div class="eras-linha"><span>1914</span><i></i><span>1939</span><i></i><span>1947</span><i></i><span>1991</span><i></i><span>HOJE</span></div></div>
+    <p class="inicio-sub">Uma única campanha que atravessa todas as guerras: das trincheiras da 1ª Guerra até os drones da guerra moderna.</p>
+    <div class="inicio-bts">
+      <button id="btContinuar" class="bt bt-ouro oculto">Continuar campanha</button>
+      <button id="btNovo" class="bt bt-ouro">Nova campanha</button>
+      <button id="btComo" class="bt">Como jogar</button>
+    </div>
+    <p class="versao">Carregando mapa…</p>
+  </div>
+</div>
+<div id="escolha" class="escolha oculto"></div>
+<script src="js/geo.js"></script>
+<script src="js/data.js"></script>
+<script src="js/art.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/map.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
