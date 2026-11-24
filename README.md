@@ -24,3 +24,10 @@ Tudo em JavaScript puro + Canvas, sem servidor. Salva no próprio navegador.
 - Os aliados dos seus inimigos também entram contra você e mandam reforços.
 - **Proclamar Império:** conquiste cidades para subir de nível (Reino → Império → Superpotência), com cerimônia, novo nome e bônus de reforços e dinheiro. A IA também vira império.
 - **Ameaça:** quanto mais você cresce, mais as potências desconfiam; com ameaça alta formam coalizões contra você.
+
+## Novidades v5
+- **Visual moderno e limpo:** HUD mínimo (bandeira, data, play/pausa e velocidade), recursos em chips compactos (toque para ver a economia), missão que recolhe sozinha, mapa só com marcador e número (nomes aparecem com zoom ou na cidade selecionada), vinheta por era.
+- **Menos avisos:** só o importante aparece na tela, agrupado; o resto vai para Notícias.
+- **Diplomacia em lista limpa:** toque no país para abrir as ações (paz, aliança, acordo, pedir ajuda, anexar, guerra).
+- **Cartas especiais no ataque:** arma da era (gás, bombardeio, míssil, drones) e sabotagem por espiões. **Anexação pacífica** de países pequenos e amigos.
+- **IA mais esperta:** escolhe fronteiras fracas, junta tropas de várias cidades, defende a capital, chama aliados, aproveita quando o inimigo está em outra guerra, usa cartas e espiões, anexa vizinhos e reage à sua ameaça. Cada personalidade joga diferente, com as mesmas regras e custos que você.

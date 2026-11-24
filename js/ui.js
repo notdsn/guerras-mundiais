@@ -14,8 +14,9 @@ const espera=ms=>new Promise(r=>setTimeout(r,ms));
 const topo=t=>t.a*3.5>=t.b*3&&t.a*3.5>t.i&&t.a>0?'a':t.b*3>t.i&&t.b>0?'b':'i';
 // ---------- avisos (no máximo 1 na tela)
 const fila=[];let toastAtivo=false;
-function toast(txt,tipo='info'){if(fila.length>=3)fila.shift();fila.push({txt,tipo});if(!toastAtivo)proxToast()}
-function proxToast(){const t=fila.shift();if(!t){toastAtivo=false;return}toastAtivo=true;const el=document.createElement('div');el.className='toast '+t.tipo;el.innerHTML=t.txt;$('#toasts').append(el);setTimeout(()=>{el.classList.add('sai');setTimeout(()=>{el.remove();proxToast()},300)},2600)}
+function toast(txt,tipo='info'){if(fila.length>=2)fila.shift();fila.push({txt,tipo});if(!toastAtivo)proxToast()}
+let lote=[],loteT=null;function avisoLote(txt,tipo){lote.push({txt,tipo});clearTimeout(loteT);loteT=setTimeout(()=>{const l=lote;lote=[];if(!l.length)return;if(l.length===1){toast(l[0].txt,l[0].tipo);return}const g=l.some(x=>x.tipo==='guerra');toast(`📰 <b>${l.length} novidades</b> · ${l[l.length-1].txt.replace(/<[^>]+>/g,'').slice(0,70)}… <u>ver notícias</u>`,g?'guerra':'info')},1200)}
+function proxToast(){const t=fila.shift();if(!t){toastAtivo=false;return}toastAtivo=true;const el=document.createElement('div');el.className='toast '+t.tipo;el.innerHTML=t.txt;if(/ver notícias/.test(t.txt)){el.style.pointerEvents='auto';el.onclick=()=>abrirPainel('noticias')}$('#toasts').append(el);setTimeout(()=>{el.classList.add('sai');setTimeout(()=>{el.remove();proxToast()},300)},2600)}
 // ---------- laço
 const cv=$('#mapa');MAPA.init(cv);
 S=SIM.novo('BRA');S.jog='__demo';MAPA.sujar();MAPA.olhar(2050,560,1.25);
@@ -57,9 +58,10 @@ function renderEscolha(){const cont={},tr={};S.prov.forEach(p=>{cont[p.d]=(cont[
 function iniciarJogo(novo){demo=false;S=SIM.get();$('#inicio').classList.add('oculto');$('#escolha').classList.add('oculto');['#hud','#nav','#botoesMapa','#missao'].forEach(s=>$(s).classList.remove('oculto'));
  MAPA.sujar();const c=P[S.nac[S.jog].cap];const eur=c.cont==='Europe';MAPA.olhar(c.x,c.y+40,eur?2.6:1.8);setVel(1);lidas=S.news.length;hud();
  if(novo){S.mis=0;S.misIni={};cinematica(0,()=>comoJogar(()=>{missoes(true)}))}else missoes(true)}
-function setVel(v){vel=v;$$('#vel button').forEach(b=>b.classList.toggle('on',+b.dataset.v===v))}
-$$('#vel button').forEach(b=>b.onclick=()=>setVel(+b.dataset.v));
+let velUlt=1;function setVel(v){vel=v;if(v>0)velUlt=v;$('#btPlay').innerHTML=v?'<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>':'<svg viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';$('#btPlay').classList.toggle('pausado',!v);$('#btVel').textContent=velUlt+'×';$('#btVel').classList.toggle('on',!!v)}
+$('#btPlay').onclick=()=>setVel(vel?0:velUlt);$('#btVel').onclick=()=>setVel(velUlt>=3?1:velUlt+1);
 $('#zMais').onclick=()=>MAPA.zoom(1.5);$('#zMenos').onclick=()=>MAPA.zoom(1/1.5);
+$('#rcDin').onclick=()=>recursosInfo();$('#rcPet').onclick=()=>recursosInfo();
 $('#zCasa').onclick=()=>{const c=P[S.nac[S.jog].cap];MAPA.voar(c.x,c.y,Math.max(2,MAPA.cam.z))};
 $('#hudNac').onclick=()=>abrirPainel('menu');
 $$('#nav [data-ic]').forEach(i=>i.innerHTML=icone(i.dataset.ic,22));
@@ -67,11 +69,11 @@ $$('#nav [data-ic]').forEach(i=>i.innerHTML=icone(i.dataset.ic,22));
 function hud(){const n=S.nac[S.jog];if(!n)return;const e=Math.min(3,S.eraMundo);document.documentElement.style.setProperty('--ac',TEMAS[e].acento);
  $('#hudBand').innerHTML=ART.bandeira(S.jog,eraDe(S.jog),n.cor);$('#hudNome').textContent=SIM.nomeNac(S.jog);$('#hudEra').textContent=ERAS[e].curto;
  $('#hudData').textContent=SIM.dataTxt(S.dia);const prox=e<3?ERAS[e+1]:null;$('#hudAno').textContent=prox?`${ERAS[e+1].curto} em ${Math.max(0,prox.ano-SIM.ano(S.dia))} anos`:'Rumo a 2030';
- const r=SIM.rendaDia(S.jog);$('#rcDin').innerHTML=`${icone('dinheiro',16)}<b>${fmt(n.din)}</b><small class="${r.din<0?'neg':''}">${r.din>=0?'+':''}${r.din.toFixed(0)}/dia</small>`;
- $('#rcPet').innerHTML=`${icone('petroleo',16)}<b>${fmt(n.pet)}</b><small>+${r.pet.toFixed(1)}</small>`;
- const br=$('#btRef');if(n.ref>0){br.classList.remove('oculto');br.innerHTML=`🎖️ <b>${n.ref}</b> reforços`;br.classList.toggle('on',modo==='reforco')}else br.classList.add('oculto');
+ const r=SIM.rendaDia(S.jog);$('#rcDin').innerHTML=`${icone('dinheiro',15)}<b>${fmt(n.din)}</b><i class="tend ${r.din<0?'neg':''}">${r.din<0?'▼':'▲'}</i>`;
+ $('#rcPet').innerHTML=`${icone('petroleo',15)}<b>${fmt(n.pet)}</b>`;
+ const br=$('#btRef');if(n.ref>0){br.classList.remove('oculto');br.innerHTML=`🎖️ <b>${n.ref}</b>`;br.classList.toggle('on',modo==='reforco')}else br.classList.add('oculto');
  const pt=SIM.podeProclamar(S.jog);const bi=$('#btImp');if(pt){bi.classList.remove('oculto');bi.innerHTML=`${SIM.TIERS[pt].ic} <b>Proclamar</b>`}else bi.classList.add('oculto');
- const am=S.ameaca||0;const ca=am>=70?'#ff4a3a':am>=40?'#ffb02e':am>=20?'#e8d35a':'#6fe39a';$('#btAm').innerHTML=`<span class="am-ic">👁️</span><span class="am-t"><small>Ameaça</small><span class="am-bar"><i style="width:${Math.max(4,am)}%;background:${ca}"></i></span></span>`;
+ const am=S.ameaca||0;const ca=am>=70?'#ff4a3a':am>=40?'#ffb02e':am>=20?'#e8d35a':'#6fe39a';$('#btAm').innerHTML=`<span class="am-dot" style="--p:${Math.max(4,am)};--c:${ca}"><span>👁</span></span>`;$('#btAm').title='Ameaça: '+SIM.ameacaTxt(am);document.body.dataset.epoca=e;
  const np=S.prop.length;const bd=$('#bDiplo');bd.classList.toggle('oculto',!np);bd.textContent=np;
  const nn=S.news.length-lidas;const bn=$('#bNews');bn.classList.toggle('oculto',nn<=0||painelAtual==='noticias');bn.textContent=nn>99?'99+':nn;
  if(painelAtual==='noticias')lidas=S.news.length}
@@ -94,6 +96,10 @@ function cerimonia(){const t=SIM.podeProclamar(S.jog);if(!t)return;const T=SIM.T
   <p class="imp-aviso">⚠️ As potências vão ficar de olho: sua <b>Ameaça</b> sobe.</p>
   <button class="bt bt-ouro grande" id="impOk">Proclamar!</button></div>`;
  $('#impOk').onclick=()=>{const r=SIM.proclamar(S.jog);if(r){$('#impNome').textContent=r.novo;$('.imp-antes').textContent=r.novo===r.antes?`${r.antes} agora é uma Potência Regional!`:`${r.antes} agora se chama`;const b=$('#impOk');b.textContent='Viva!';b.onclick=()=>{c.classList.add('oculto');hud();MAPA.sujar()};S.stats.imp=(S.stats.imp||0)+1;c.querySelector('.coroa').classList.add('brilha');MAPA.sujar();hud()}}}
+function recursosInfo(){const n=S.nac[S.jog];const r=SIM.rendaDia(S.jog);const t=n.tier?SIM.TIERS[n.tier]:null;
+ modal(`<h3>Economia</h3><div class="rec-l"><div><span>${icone('dinheiro',18)} Dinheiro</span><b>${fmt(n.din)}</b></div><div><span>Renda das cidades</span><b class="pos">+${(r.bruto-(r.com?r.com.din:0)).toFixed(0)}/dia</b></div>${r.com&&r.com.din?`<div><span>💰 Acordos comerciais</span><b class="pos">+${r.com.din.toFixed(0)}/dia</b></div>`:''}${t?`<div><span>${t.ic} Bônus de ${t.n}</span><b class="pos">+${Math.round(t.renda*100)}%</b></div>`:''}<div><span>Manutenção das tropas</span><b class="neg">−${r.man.toFixed(0)}/dia</b></div><div class="tot"><span>Saldo</span><b class="${r.din<0?'neg':'pos'}">${r.din>=0?'+':''}${r.din.toFixed(0)}/dia</b></div>
+ <div><span>${icone('petroleo',18)} Petróleo</span><b>${fmt(n.pet)} <small class="pos">+${r.pet.toFixed(1)}/dia</small></b></div></div>
+ <p class="ajuda">Mais dinheiro: conquiste cidades, construa Fábricas e feche acordos comerciais. Tropas demais custam caro.</p><div class="acoes"><button class="bt" data-fechar>Fechar</button></div>`)}
 function sairModo(){modo=null;MAPA.moveis=null;dica(null);hud()}
 function modoMover(p){if(SIM.total(S.prov[p])<2){toast('Precisa de pelo menos 2 tropas para mover (1 fica guardando a cidade).');return}sel=p;alcance=SIM.alcancaveis(p);if(!alcance.size){toast('Nenhuma cidade sua ligada a esta.');return}fecharSheet();modo='mover';MAPA.selProv=p;MAPA.alvos=null;MAPA.moveis=[...alcance.keys()];
  dica(`🚚 Toque na cidade <b class="verde">verde</b> para onde as tropas de <b>${P[p].n}</b> vão. <button class="bt mini" id="dCancel">Cancelar</button>`);const b=$('#dCancel');if(b)b.onclick=e=>{e.stopPropagation();sairModo();selecionar(p)};
@@ -112,7 +118,7 @@ function desselecionar(){sel=null;MAPA.selProv=null;MAPA.alvos=null;if(modo!=='r
 function focar(p){const [sx,sy]=MAPA.W2S(P[p].x,P[p].y);if(sy>innerHeight*.42||sy<130||sx<30||sx>innerWidth-30){const z=MAPA.cam.z;MAPA.voar(P[p].x,P[p].y+(innerHeight*.5-innerHeight*.3)/z,z,.5)}}
 function dica(t){const d=$('#dica');if(!t){d.classList.add('oculto');return}d.innerHTML=t;d.classList.remove('oculto')}
 // ---------- folha da cidade
-let sheetTipo=null,sheetP=null;
+let sheetTipo=null,sheetP=null,sheetCons=false;
 function abrirSheet(t,p=sel){sheetTipo=t;sheetP=p;const sh=$('#sheet');sh.classList.remove('oculto');renderSheet();dica(null)}
 function fecharSheet(){$('#sheet').classList.add('oculto');sheetTipo=null;sheetP=null}
 function abrirInfo(p){sel=null;MAPA.selProv=p;MAPA.alvos=null;MAPA.moveis=null;abrirSheet('info',p);focar(p)}
@@ -122,16 +128,18 @@ function renderSheet(){const p=sheetP;if(p==null)return;const pr=S.prov[p];const
  const st=meu?'<span class="chip meu">Sua cidade</span>':SIM.emGuerra(d,S.jog)?'<span class="chip guerra">Em guerra</span>':SIM.aliado(d,S.jog)?'<span class="chip ali">Aliado</span>':'<span class="chip">Em paz</span>';
  let h=`<div class="cab">${band(d)}<div class="cab-t"><h3>${P[p].n}${cap?' <span class="estrela">★</span>':''}</h3><div class="sub">${SIM.nomeNac(d)} ${st}</div></div><button class="x" data-fechar aria-label="Fechar">✕</button></div>`;
  h+=tropasHTML(pr,e,meu);
- h+=`<div class="forca-l"><span>🛡️ Defesa <b>${fmt(SIM.defesa(p))}</b></span><span>${terrenoTxt(p)}</span>${pr.fort?`<span>Fortaleza +${pr.fort*40}%</span>`:''}${cap?'<span>Capital +20%</span>':''}</div>`;
+ h+=`<div class="info-l"><span>🛡️ <b>${fmt(SIM.defesa(p))}</b> defesa</span><span>${TERRENOS[P[p].ter].n}</span>${pr.fort?`<span>🏰 Fortaleza ${pr.fort}</span>`:''}${cap?'<span>★ Capital</span>':''}${pr.sab>S.dia?'<span class="sab">🕵️ sabotada</span>':''}</div>`;
  if(meu){const nr=S.nac[S.jog].ref;if(nr>0)h+=`<button class="bt bt-ouro grande" data-colocar>🎖️ Colocar ${nr} reforços aqui</button>`;
   const temAlvo=SIM.viz(p).some(q=>S.prov[q].d!==S.jog&&!SIM.aliado(S.prov[q].d,S.jog));
   h+=`<div class="acoes-cid"><button class="bt bt-mov grande" data-mover>🚚 Mover tropas</button>${temAlvo?`<button class="bt bt-atk grande" data-atacarviz>⚔️ Atacar</button>`:''}</div>`;
-  h+=`<p class="ajuda">Ou toque direto no mapa: cidade <b class="vermelho">vermelha</b> = atacar · <b class="verde">verde</b> (sua) = mover tropas.</p>`;
-  h+=`<div class="sec">Construções</div><div class="preds">${Object.entries(SIM.PREDIOS).map(([k,B])=>{const lv=pr[k];const cu=B.c(lv);return `<div class="pd"><div class="pd-ic">${k==='fab'?'🏭':'🏰'}</div><div class="pd-t"><b>${B.n} <small>${lv}/${B.max}</small></b><small>${B.d}</small></div>${lv<B.max?`<button class="bt mini" data-cons="${k}">${icone('dinheiro',12)} ${cu.din}</button>`:'<span class="max">Máximo</span>'}</div>`}).join('')}</div>`}
+  if((S.mis||0)<4)h+=`<p class="ajuda">Dica: no mapa, cidade <b class="vermelho">vermelha</b> = atacar · <b class="verde">verde</b> = mover.</p>`;
+  h+=`<details class="dobra"${sheetCons?' open':''}><summary>🏗️ Construções <small>Fábrica ${pr.fab}/2 · Fortaleza ${pr.fort}/2</small></summary><div class="preds">${Object.entries(SIM.PREDIOS).map(([k,B])=>{const lv=pr[k];const cu=B.c(lv);return `<div class="pd"><div class="pd-ic">${k==='fab'?'🏭':'🏰'}</div><div class="pd-t"><b>${B.n} <small>${lv}/${B.max}</small></b><small>${B.d}</small></div>${lv<B.max?`<button class="bt mini" data-cons="${k}">${icone('dinheiro',12)} ${cu.din}</button>`:'<span class="max">Máximo</span>'}</div>`}).join('')}</div></details>`}
  else{const fontes=SIM.fontesPara(p);const ali=SIM.aliado(d,S.jog);
   if(!ali&&fontes.length)h+=`<button class="bt bt-atk grande" data-atq>⚔️ Atacar ${P[p].n}</button>`;else if(!ali)h+=`<p class="ajuda">Você não faz fronteira com esta cidade. Conquiste as cidades do caminho para chegar aqui.</p>`;
-  h+=`<div class="sec">${SIM.nomeNac(d)}</div><div class="dip-bts">${diploBts(d)}</div>`}
+  if(!ali)h+=`<button class="bt linha" data-sabcid>🕵️ Sabotar esta cidade <small>${icone('dinheiro',11)} ${SIM.custoSab().din}${SIM.esperaSab()?` · ${SIM.esperaSab()}d`:''}</small></button>`;
+  h+=`<button class="bt linha" data-pais="${d}">${band(d)} Diplomacia com ${SIM.nomeNac(d)} <span class="chev">›</span></button>`}
  c.innerHTML=h;
+ const dd=c.querySelector('details.dobra');if(dd)dd.ontoggle=()=>{sheetCons=dd.open};
  c.querySelector('[data-fechar]').onclick=desselecionar;
  $$('#sheetC [data-rec]').forEach(b=>b.onclick=()=>{const r=SIM.recrutar(p,b.dataset.rec,+b.dataset.q);if(r==='ok'){MAPA.texto(P[p].x,P[p].y,'+'+b.dataset.q,'#7dff9a');renderSheet();hud()}else toast(r)});
  $$('#sheetC [data-cons]').forEach(b=>b.onclick=()=>{const r=SIM.construir(p,b.dataset.cons);if(r==='ok'){toast(`${SIM.PREDIOS[b.dataset.cons].n} construída em ${P[p].n}!`,'ok');renderSheet();hud()}else toast(r)});
@@ -139,7 +147,8 @@ function renderSheet(){const p=sheetP;if(p==null)return;const pr=S.prov[p];const
  const bm=c.querySelector('[data-mover]');if(bm)bm.onclick=()=>modoMover(p);
  const bav=c.querySelector('[data-atacarviz]');if(bav)bav.onclick=()=>{fecharSheet();dica(`⚔️ Toque numa cidade <b class="vermelho">vermelha</b> piscando para atacar a partir de <b>${P[p].n}</b>.`);const z=Math.max(MAPA.cam.z,1.6);MAPA.voar(P[p].x,P[p].y,z,.5)};
  const ba=c.querySelector('[data-atq]');if(ba)ba.onclick=()=>{const f=SIM.fontesPara(p).sort((a,b)=>SIM.forcaCidade(b)-SIM.forcaCidade(a));abrirAtaque(p,[f[0]])};
- ligarDiplo(c)}
+ const bsc=c.querySelector('[data-sabcid]');if(bsc)bsc.onclick=()=>{const r=SIM.sabotar(p);toast(r.txt,r.ok?'ok':'info');renderSheet();hud()};
+ c.querySelectorAll('[data-pais]').forEach(b=>b.onclick=()=>acoesPais(b.dataset.pais));ligarDiplo(c)}
 // ---------- painel de ataque
 function abrirAtaque(alvo,fontes){atqEst={modo:'atq',alvo,fontes:new Set(fontes),frac:1};fecharSheet();$('#atq').classList.remove('oculto');dica(null);renderAtq()}
 function abrirMover(de,para){const t=SIM.separar(de,.5);if(t.i+t.b+t.a===0){const pr=S.prov[de];for(const k of TK)t[k]=0;const k=TK.find(k=>pr[k]>0&&SIM.total(pr)>1);if(k)t[k]=1}atqEst={modo:'mov',de,para,t};fecharSheet();$('#atq').classList.remove('oculto');renderAtq()}
@@ -179,11 +188,15 @@ function renderAtq(){const A=atqEst;const c=$('#atqC');const eu=S.jog;const e=er
    <div class="lado ini"><img class="grande flip" src="${imgT(topo(tp),ed)}" alt="">${miniTropas(tp,ed)}<b class="forca">${fmt(pr.D)}</b><small>Defesa</small></div></div>
   ${bon.length?`<div class="bonus">Defesa: ${bon.join(' · ')}</div>`:''}${pr.mar?'<div class="bonus mar">🌊 Ataque pelo mar: −40% de força</div>':''}
   <div class="chance"><div class="barra"><i style="width:${ch}%;background:${cor}"></i></div><b style="color:${cor}">Chance de vitória: ${ch}%</b></div>
+  ${(()=>{const E=SIM.especial();const ce=SIM.custoEsp(),cs=SIM.custoSab();const we=SIM.esperaEsp(),ws=SIM.esperaSab();return `<button class="cartas-t ${A.cartas?'on':''}" data-cartas>✨ Cartas especiais <span>${A.cartas?'▾':'▸'}</span></button>${A.cartas?`<div class="cartas"><button class="carta" data-esp ${we?'disabled':''}><b>${E.ic} ${E.n}</b><small>${we?`recarrega em ${we}d`:`−25% tropas inimigas · ${icone('dinheiro',11)}${ce.din} ${icone('petroleo',11)}${ce.pet}`}</small></button><button class="carta" data-sab ${ws?'disabled':''}><b>🕵️ Sabotagem</b><small>${ws?`espiões voltam em ${ws}d`:`−25% defesa · ${icone('dinheiro',11)}${cs.din} · 75% sucesso`}</small></button></div>`:''}`})()}
   <div class="fontes"><small>Atacar a partir de (toque para somar):</small><div>${fontesTodas.map(f=>`<button class="chip ${A.fontes.has(f)?'on':''}" data-f="${f}">${P[f].n} · ${SIM.total(S.prov[f])}</button>`).join('')}</div></div>
   <div class="seg">${[[.5,'Metade das tropas'],[1,'Quase todas']].map(([f,l])=>`<button class="${A.frac===f?'on':''}" data-frac="${f}">${l}</button>`).join('')}</div>
   <div class="acoes"><button class="bt" data-cancelar>Cancelar</button><button class="bt bt-atk" data-ir ${pr.fontes.length?'':'disabled'}>⚔️ ATACAR</button></div>`;
   $$('#atqC [data-f]').forEach(b=>b.onclick=()=>{const f=+b.dataset.f;if(A.fontes.has(f)){if(A.fontes.size>1)A.fontes.delete(f)}else A.fontes.add(f);renderAtq()})}
  $$('#atqC [data-frac]').forEach(b=>b.onclick=()=>{A.frac=+b.dataset.frac;renderAtq()});
+ const bct=c.querySelector('[data-cartas]');if(bct)bct.onclick=()=>{A.cartas=!A.cartas;renderAtq()};
+ const bes=c.querySelector('[data-esp]');if(bes)bes.onclick=()=>{const r=SIM.usarEspecial(A.alvo);toast(r.txt,r.ok?'guerra':'info');if(r.ok){const q=P[A.alvo];MAPA.explosao(q.x,q.y,3);MAPA.tremer&&MAPA.tremer(.6)}hud();renderAtq()};
+ const bsb=c.querySelector('[data-sab]');if(bsb)bsb.onclick=()=>{const r=SIM.sabotar(A.alvo);toast(r.txt,r.ok?'ok':'info');hud();renderAtq()};
  c.querySelector('[data-cancelar]').onclick=()=>{const de=A.modo==='mov'?A.de:sel;fecharAtq();if(de!=null&&S.prov[de].d===S.jog)selecionar(de);else desselecionar()};
  c.querySelector('[data-ir]').onclick=()=>A.modo==='mov'?mover():atacar()}
 async function mover(){const A=atqEst;fecharAtq();const t=SIM.mover(A.de,A.para,A.t);if(!t)return;const e=eraDe(S.jog);MAPA.marcha(P[A.de].x,P[A.de].y,P[A.para].x,P[A.para].y,topo(t),e,.9);animando=true;MAPA.alvos=null;MAPA.moveis=null;await espera(900);animando=false;MAPA.texto(P[A.para].x,P[A.para].y,'+'+(t.i+t.b+t.a),'#7dff9a');selecionar(A.para)}
@@ -208,8 +221,18 @@ function diploBts(d){if(d===S.jog||!S.nac[d])return '';const g=SIM.emGuerra(d,S.
  const c=SIM.temCom(d,S.jog);const com=g?'':c?`<button class="bt bt-com off" data-dip="cancelarcom" data-n="${d}">💔 Cancelar acordo</button>`:`<button class="bt bt-com" data-dip="comercio" data-n="${d}">💰 Acordo comercial</button>`;
  const aj=a&&SIM.precisaAjuda(d)?`<button class="bt bt-ajuda" data-dip="ajuda" data-n="${d}">🆘 Pedir ajuda na guerra</button>`:a&&SIM.guerrasDe(S.jog).length?`<span class="chip ali lutando">⚔️ Lutando ao seu lado</span>`:'';
  return g?`<button class="bt" data-dip="paz" data-n="${d}">🕊️ Propor paz</button>`:a?`${aj}${com}<button class="bt" data-dip="romper" data-n="${d}">Romper aliança</button>`:`<button class="bt" data-dip="alianca" data-n="${d}">🤝 Propor aliança</button>${com}<button class="bt perigo" data-dip="guerra" data-n="${d}">⚔️ Declarar guerra</button>`}
-function ligarDiplo(root){const di=root.querySelector('#dImp');if(di)di.onclick=()=>infoImperio();root.querySelectorAll('[data-dip]').forEach(b=>b.onclick=()=>{const t=b.dataset.dip,d=b.dataset.n;if(t==='guerra'){modal(`<h3>Declarar guerra?</h3><p>Você vai entrar em guerra contra ${SIM.oNac(d)}${SIM.aliadosDe(d).length?' e os aliados podem ajudar o inimigo':''}.</p><div class="acoes"><button class="bt" data-fechar>Cancelar</button><button class="bt perigo" id="mSim">Declarar guerra</button></div>`);$('#mSim').onclick=()=>{fecharModal();const r=SIM.propor('guerra',d);toast(r.txt,'guerra');MAPA.sujar();atualizar()};return}
+function ligarDiplo(root){const di=root.querySelector('#dImp');if(di)di.onclick=()=>infoImperio();const da=root.querySelector('#dAm');if(da)da.onclick=()=>infoImperio();
+ if(root.id==='painelC')root.querySelectorAll('[data-pais]').forEach(b=>b.onclick=()=>acoesPais(b.dataset.pais));root.querySelectorAll('[data-dip]').forEach(b=>b.onclick=()=>{const t=b.dataset.dip,d=b.dataset.n;if(t==='guerra'){modal(`<h3>Declarar guerra?</h3><p>Você vai entrar em guerra contra ${SIM.oNac(d)}${SIM.aliadosDe(d).length?' e os aliados podem ajudar o inimigo':''}.</p><div class="acoes"><button class="bt" data-fechar>Cancelar</button><button class="bt perigo" id="mSim">Declarar guerra</button></div>`);$('#mSim').onclick=()=>{fecharModal();const r=SIM.propor('guerra',d);toast(r.txt,'guerra');MAPA.sujar();atualizar()};return}
  const r=t==='ajuda'?SIM.pedirAjuda(d):SIM.propor(t,d);toast(r.txt,r.ok?'ok':'info');MAPA.sujar();atualizar()})}
+function acoesPais(d){const n=S.nac[d];if(!n)return;const cont=SIM.cidadesDe(d).length;const r=SIM.rel(d,S.jog);const rt=r>=40?'ótima':r>=10?'boa':r>-15?'neutra':r>-40?'ruim':'péssima';
+ const st=SIM.emGuerra(d,S.jog)?'<span class="chip guerra">Em guerra</span>':SIM.aliado(d,S.jog)?'<span class="chip ali">Aliado</span>':'<span class="chip">Em paz</span>';
+ const ax=SIM.podeAnexar(d);const pequeno=cont<=5&&!SIM.emGuerra(d,S.jog)&&SIM.vizinhosNac(S.jog).includes(d);
+ modal(`<div class="prop-cab">${band(d)}<div><h3>${SIM.nomeNac(d)}</h3><div class="sub">${st}</div></div></div>
+ <div class="pais-info"><span><b>${cont}</b><small>cidades</small></span><span><b>${PERSONAS[n.persona].n}</b><small>personalidade</small></span><span><b>${rt}</b><small>relação</small></span>${SIM.temCom(d,S.jog)?`<span><b>+${SIM.valorComCom(d,S.jog)}</b><small>💰 por dia</small></span>`:''}</div>
+ <div class="pais-bts">${diploBts(d)}${pequeno?`<button class="bt ${ax?'':'bt-ouro'}" data-anexar ${ax?'disabled':''}>🤝 Anexar pacificamente <small>${ax?ax:icone('dinheiro',11)+' '+SIM.custoAnex(d).din}</small></button>`:''}</div>
+ <div class="acoes"><button class="bt" data-fechar>Fechar</button></div>`);
+ const mc=$('#modalC');mc.querySelectorAll('[data-dip]').forEach(b=>{const t=b.dataset.dip;if(t==='guerra')return;b.addEventListener('click',()=>{setTimeout(()=>{if(!$('#modal').classList.contains('oculto')&&!$('#mSim'))fecharModal()},10)})});ligarDiplo(mc);
+ const ba=mc.querySelector('[data-anexar]');if(ba)ba.onclick=()=>{const r=SIM.anexar(d);fecharModal();toast(r.txt,r.ok?'ok':'info');MAPA.sujar();atualizar()}}
 function atualizar(){if(sheetTipo)renderSheet();if(painelAtual)renderPainel();hud()}
 let propAberta=null;
 function proximaProposta(){if(propAberta&&$('#modal').classList.contains('oculto'))propAberta=null;if(propAberta||!S.prop.length||animando||(S.mis||0)<1)return;const pr=S.prop[0];if(!S.nac[pr.de]||!S.nac[pr.de].vivo){S.prop.shift();return}propAberta=pr;
@@ -233,10 +256,12 @@ function renderPainel(){const p=painelAtual;const c=$('#painelC');const T={pesqu
  else if(p==='diplo'){const props=S.prop;const vivos=id=>S.nac[id]&&S.nac[id].vivo&&SIM.cidadesDe(id).length;const guerras=SIM.guerrasDe(S.jog).filter(vivos),alis=SIM.aliadosDe(S.jog).filter(vivos);const viz=SIM.vizinhosNac(S.jog).filter(x=>!guerras.includes(x)&&!alis.includes(x));
   const cont={};S.prov.forEach(q=>cont[q.d]=(cont[q.d]||0)+1);const grandes=Object.keys(S.nac).filter(id=>id!==S.jog&&vivos(id)&&!guerras.includes(id)&&!alis.includes(id)&&!viz.includes(id)).sort((a,b)=>(cont[b]||0)-(cont[a]||0)).slice(0,6);
   const relTxt=id=>{const r=SIM.rel(id,S.jog);return r>=40?'<i class="rb">ótima</i>':r>=10?'<i class="rb">boa</i>':r>-15?'neutra':r>-40?'<i class="rm">ruim</i>':'<i class="rm">péssima</i>'};const coms=SIM.comerciosDe(S.jog).filter(vivos);const bc=SIM.bonusCom(S.jog);
-  const linha=id=>`<div class="nrow">${band(id)}<div class="nr-t"><b>${SIM.nomeNac(id)}</b><small>${cont[id]||0} cidades · ${PERSONAS[S.nac[id].persona].n} · relação ${relTxt(id)}</small>${SIM.temCom(id,S.jog)?`<small class="tag-com">💰 Acordo comercial: +${SIM.valorComCom(id,S.jog)}/dia</small>`:''}</div><div class="nr-b">${diploBts(id)}</div></div>`;
+  const relCor=id=>{const r=SIM.rel(id,S.jog);return r>=10?'#5be37a':r>-15?'#c9c9c9':'#ff6a5a'};
+  const linha=id=>`<button class="nrow2" data-pais="${id}">${band(id)}<span class="nr-t"><b>${SIM.nomeNac(id)}</b><small><i class="rdot" style="background:${relCor(id)}"></i>${cont[id]||0} cidades · ${PERSONAS[S.nac[id].persona].n}</small></span><span class="nr-tags">${SIM.temCom(id,S.jog)?'<i title="Acordo comercial">💰</i>':''}${SIM.precisaAjuda(id)?'<i class="sos">🆘</i>':''}${SIM.aliado(id,S.jog)&&!SIM.precisaAjuda(id)&&SIM.guerrasDe(S.jog).length?'<i>⚔️</i>':''}</span><span class="chev">›</span></button>`;
   c.innerHTML=`${props.length?`<div class="sec">Propostas (${props.length})</div>${props.map((pr,i)=>`<div class="prop">${band(pr.de)}<p>${pr.txt}</p><div class="acoes"><button class="bt" data-pn="${i}">Recusar</button><button class="bt bt-ouro" data-ps="${i}">Aceitar</button></div></div>`).join('')}`:''}
-  <button class="imp-box" id="dImp"><div><b>${S.nac[S.jog].tier?SIM.TIERS[S.nac[S.jog].tier].ic+' '+SIM.nomeNac(S.jog)+' · nível '+S.nac[S.jog].tier+'/3':'🏳️ Sem título imperial'}</b><small>${proxTierTxt()}</small></div><div class="am-mini"><small>Ameaça: ${SIM.ameacaTxt(S.ameaca||0)}</small><span class="am-bar"><i style="width:${Math.max(4,S.ameaca||0)}%;background:${(S.ameaca||0)>=70?'#ff4a3a':(S.ameaca||0)>=40?'#ffb02e':'#6fe39a'}"></i></span></div></button>
-  <div class="com-box"><b>💰 Acordos comerciais (${coms.length}/6)</b><span>${coms.length?`Rendendo <b>+${bc.din.toFixed(0)}</b> de dinheiro e <b>+${bc.pet.toFixed(1)}</b> de petróleo por dia.`:'Feche acordos com países em paz: os dois ganham dinheiro e petróleo todo dia.'}</span>${coms.length?`<div class="com-l">${coms.map(id=>band(id)+' '+SIM.nomeNac(id)).join(' · ')}</div>`:''}</div>
+  <div class="resumo-d"><button id="dImp" class="rchip">${S.nac[S.jog].tier?SIM.TIERS[S.nac[S.jog].tier].ic+' Nível '+S.nac[S.jog].tier:'🏳️ Sem título'}</button><button id="dAm" class="rchip"><i class="rdot" style="background:${(S.ameaca||0)>=70?'#ff4a3a':(S.ameaca||0)>=40?'#ffb02e':'#5be37a'}"></i>Ameaça ${SIM.ameacaTxt(S.ameaca||0).toLowerCase()}</button><span class="rchip">💰 ${coms.length}/6 acordos${coms.length?` · +${bc.din.toFixed(0)}/dia`:''}</span></div>
+  <button class="imp-box oculto"><div><b>${S.nac[S.jog].tier?SIM.TIERS[S.nac[S.jog].tier].ic+' '+SIM.nomeNac(S.jog)+' · nível '+S.nac[S.jog].tier+'/3':'🏳️ Sem título imperial'}</b><small>${proxTierTxt()}</small></div><div class="am-mini"><small>Ameaça: ${SIM.ameacaTxt(S.ameaca||0)}</small><span class="am-bar"><i style="width:${Math.max(4,S.ameaca||0)}%;background:${(S.ameaca||0)>=70?'#ff4a3a':(S.ameaca||0)>=40?'#ffb02e':'#6fe39a'}"></i></span></div></button>
+  <div class="com-box oculto"><b>💰 Acordos comerciais (${coms.length}/6)</b><span>${coms.length?`Rendendo <b>+${bc.din.toFixed(0)}</b> de dinheiro e <b>+${bc.pet.toFixed(1)}</b> de petróleo por dia.`:'Feche acordos com países em paz: os dois ganham dinheiro e petróleo todo dia.'}</span>${coms.length?`<div class="com-l">${coms.map(id=>band(id)+' '+SIM.nomeNac(id)).join(' · ')}</div>`:''}</div>
   <div class="sec">Em guerra (${guerras.length})</div>${guerras.map(linha).join('')||'<p class="ajuda">Você está em paz com todos.</p>'}
   <div class="sec">Aliados (${alis.length})</div>${alis.map(linha).join('')||'<p class="ajuda">Nenhum aliado. Ter um inimigo em comum ajuda a fechar alianças.</p>'}
   <div class="sec">Vizinhos</div>${viz.map(linha).join('')||'<p class="ajuda">—</p>'}
@@ -282,19 +307,24 @@ function missoes(abrir){if(!S||demo||!S.nac[S.jog])return;S.misIni=S.misIni||{};
  if(m.ok(b)){S.nac[S.jog].din+=m.premio;toast(`🎯 Missão cumprida: <b>${m.t}</b> · +${m.premio} ${icone('dinheiro',12)}`,'ok');S.mis=(S.mis||0)+1;m=misAtual();S.misIni[S.mis+'']=base();abrir=true;MAPA.missao=null}
  if(m.origem){const a=MAPA.missao;if(a==null||S.prov[a].d!==S.jog||SIM.total(S.prov[a])<3)MAPA.missao=origemSugerida()}else if(m.alvo){const a=MAPA.missao;if(a==null||S.prov[a].d===S.jog||!SIM.fontesPara(a).length)MAPA.missao=alvoSugerido(m.alvo===2)}else MAPA.missao=null;
  const bb=S.misIni[(S.mis||0)+''];const pg=m.prog?m.prog(bb):null;
- $('#missao').innerHTML=`<span class="mi">🎯</span><span class="mt"><small>MISSÃO ${(S.mis||0)+1}</small><b>${m.t}${pg?` (${Math.max(0,pg[0])}/${pg[1]})`:''}</b></span>`;
+ const htm=`<span class="mi">🎯</span><span class="mt"><small>MISSÃO ${(S.mis||0)+1}</small><b>${m.t}${pg?` (${Math.max(0,pg[0])}/${pg[1]})`:''}</b></span>`;const bm=$('#missao');if(bm.dataset.h!==htm){bm.dataset.h=htm;bm.innerHTML=htm;expandeMissao()}
  if(abrir)missaoInfo(true)}
-function missaoInfo(auto){const m=misAtual();dica(`<b>🎯 ${m.t}</b><br>${m.d}`);if(m.alvo&&MAPA.missao!=null){const p=P[MAPA.missao];const z=Math.max(2.2,MAPA.cam.z);MAPA.voar(p.x,p.y+40/z,z,.8)}clearTimeout(missaoInfo.t);missaoInfo.t=setTimeout(()=>{if(!modo)dica(null)},9000)}
-$('#missao').onclick=()=>missaoInfo();
+function missaoInfo(auto){const m=misAtual();dica(`<b>🎯 ${m.t}</b><br>${m.d}`);if(m.alvo&&MAPA.missao!=null){const p=P[MAPA.missao];const z=Math.max(2.2,MAPA.cam.z);MAPA.voar(p.x,p.y+40/z,z,.8)}clearTimeout(missaoInfo.t);missaoInfo.t=setTimeout(()=>{if(!modo)dica(null)},6500)}
+function expandeMissao(){const bm=$('#missao');bm.classList.remove('mini');clearTimeout(expandeMissao.t);expandeMissao.t=setTimeout(()=>bm.classList.add('mini'),6000)}
+$('#missao').onclick=()=>{expandeMissao();missaoInfo()};
 // ---------- eventos da simulação
-let ultAli=-99;SIM.onNoticia=n=>{if(demo)return;if(n.tipo==='era')return;if(n.tipo==='aliado')return;if(n.tipo==='aliado_vit'||(n.tipo==='alianca'&&/enviou|enviaram/.test(n.txt))||(n.tipo==='guerra'&&/enviou|enviaram/.test(n.txt))){if(S.dia-ultAli<12)return;ultAli=S.dia;toast(n.txt,n.tipo==='guerra'?'guerra':'ok');return}if(n.tipo==='imperio'&&!n.txt.includes(SIM.nomeNac(S.jog))){toast(n.txt,'info');return}if(n.tipo==='ameaca'){toast(n.txt,'guerra');return}if(n.meu){const tp=n.tipo==='paz'||n.tipo==='alianca'?'ok':n.tipo==='guerra'||n.tipo==='traicao'||n.tipo==='conquista'?'guerra':'info';toast(n.txt,tp)}};
-SIM.onBatalha=r=>{if(demo||r.id===S.jog)return;const p=P[r.alvo];if(r.dono===S.jog){MAPA.explosao(p.x,p.y,2);if(r.vit){toast(`🏴 ${SIM.OoNac(r.id)} ${SIM.V(r.id,'tomou','tomaram')} <b>${p.n}</b>!`,'guerra')}else{toast(`🛡️ Defendemos <b>${p.n}</b> do ataque ${SIM.deNac(r.id)}!`,'ok');MAPA.texto(p.x,p.y,'DEFENDIDA','#7dff9a')}}else{const [sx,sy]=MAPA.W2S(p.x,p.y);if(sx>0&&sy>0&&sx<innerWidth&&sy<innerHeight&&Math.random()<.6)MAPA.explosao(p.x,p.y,1)}};
+SIM.onNoticia=n=>{if(demo||n.tipo==='era')return;const t=n.txt;
+ if(n.tipo==='ameaca'){avisoLote(t,'guerra');return}if(!n.meu)return;
+ if(/enviou|enviaram|Aliado:|fecham um acordo|Sabotagem/.test(t)||n.tipo==='info'||n.tipo==='aliado'||n.tipo==='aliado_vit')return;
+ if(n.tipo==='imperio'&&!t.includes(SIM.nomeNac(S.jog)))return;
+ const tp=n.tipo==='paz'||n.tipo==='alianca'||n.tipo==='imperio'?'ok':'guerra';avisoLote(t,tp)};
+SIM.onBatalha=r=>{if(demo||r.id===S.jog)return;const p=P[r.alvo];if(r.dono===S.jog){MAPA.explosao(p.x,p.y,2);if(r.vit){avisoLote(`🏴 ${SIM.OoNac(r.id)} ${SIM.V(r.id,'tomou','tomaram')} <b>${p.n}</b>!`,'guerra')}else{MAPA.texto(p.x,p.y,'DEFENDIDA','#7dff9a')}}else{const [sx,sy]=MAPA.W2S(p.x,p.y);if(sx>0&&sy>0&&sx<innerWidth&&sy<innerHeight&&Math.random()<.6)MAPA.explosao(p.x,p.y,1)}};
 SIM.onConquista=(p,id,antigo)=>{MAPA.sujar();if(sheetP===p||sel===p){if(S.prov[p].d!==S.jog&&sel===p)desselecionar();else if(sheetTipo)renderSheet()}else if(sel!=null)selecionar(sel)};
-SIM.onReforco=r=>{if(demo)return;toast(`🎖️ Chegaram <b>${r} reforços</b>! Toque no botão 🎖️ lá em cima para colocá-los.`,'ok')};
+SIM.onReforco=r=>{if(demo)return;const b=$('#btRef');b.classList.remove('chegou');void b.offsetWidth;b.classList.add('chegou');if((S.mis||0)<5)toast(`🎖️ Chegaram <b>${r} reforços</b>! Toque no botão 🎖️ lá em cima para colocá-los.`,'ok')};
 SIM.onEra=e=>{if(demo)return;MAPA.sujar();setTimeout(()=>cinematica(e),animando?3000:100)};
 SIM.onDerrota=()=>{modal(`<h3>Seu país caiu</h3><p>${SIM.OoNac(S.jog)} foi derrotad${SIM.artigo(S.jog)==='a'?'a':'o'} em ${SIM.dataTxt(S.dia)}. Você conquistou ${S.stats.conq} cidades.</p><div class="acoes"><button class="bt bt-ouro" id="mNovo">Nova campanha</button></div>`);$('#mNovo').onclick=()=>{localStorage.removeItem(SAVE);location.reload()}};
 SIM.onFim=()=>{if(S.fim)return;S.fim=1;const cont={};S.prov.forEach(q=>cont[q.d]=(cont[q.d]||0)+1);const rk=Object.keys(cont).sort((a,b)=>cont[b]-cont[a]);const pos=rk.indexOf(S.jog)+1;modal(`<h3>Fim da campanha: 2030</h3><p>Você atravessou todas as guerras! ${SIM.OoNac(S.jog)} terminou em <b>${pos}º lugar</b> no mundo, com ${cont[S.jog]||0} cidades.</p><div class="acoes"><button class="bt bt-ouro" data-fechar>Continuar jogando</button></div>`)};
 // ---------- salvar
 function salvar(){if(demo||!S||!S.nac[S.jog])return;try{localStorage.setItem(SAVE,SIM.exportar())}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)salvar()});
-window.__G={get S(){return SIM.get()},SIM,MAPA,iniciar:id=>{S=SIM.novo(id);iniciarJogo(false);S.mis=0;S.misIni={};missoes(true)},setVel,selecionar,abrirAtaque,abrirMover,abrirPainel,fecharPainel,salvar,cinematica,missoes,get vel(){return vel},get animando(){return animando},fecharCine:()=>{$('#cine').classList.add('oculto')},fecharModal};
+window.__G={get S(){return SIM.get()},acoesPais:d=>acoesPais(d),SIM,MAPA,iniciar:id=>{S=SIM.novo(id);iniciarJogo(false);S.mis=0;S.misIni={};missoes(true)},setVel,selecionar,abrirAtaque,abrirMover,abrirPainel,fecharPainel,salvar,cinematica,missoes,get vel(){return vel},get animando(){return animando},fecharCine:()=>{$('#cine').classList.add('oculto')},fecharModal};
