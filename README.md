@@ -31,3 +31,14 @@ Tudo em JavaScript puro + Canvas, sem servidor. Salva no próprio navegador.
 - **Diplomacia em lista limpa:** toque no país para abrir as ações (paz, aliança, acordo, pedir ajuda, anexar, guerra).
 - **Cartas especiais no ataque:** arma da era (gás, bombardeio, míssil, drones) e sabotagem por espiões. **Anexação pacífica** de países pequenos e amigos.
 - **IA mais esperta:** escolhe fronteiras fracas, junta tropas de várias cidades, defende a capital, chama aliados, aproveita quando o inimigo está em outra guerra, usa cartas e espiões, anexa vizinhos e reage à sua ameaça. Cada personalidade joga diferente, com as mesmas regras e custos que você.
+
+## Novidades v6
+- **Generais por era** (retratos pintados, personagens fictícios): contrate até 3 e coloque numa cidade. Bônus de ataque, defesa, blindados ou aviação. Podem recuar ou ser capturados quando a cidade cai. A IA também contrata.
+- **Cartas de bônus estilo WAR**: conquistou 1 cidade no mês, ganha 1 carta (▲ ■ ● ou ★ coringa). Com 3 iguais ou 3 diferentes, troque por reforços (4, 6, 8, 10, 12, 15…). O botão 🃏 só aparece quando dá para trocar.
+- **Objetivo secreto** no começo (dominar continente, destruir um rival ou ter N cidades). Ao cumprir, aparece a tela de vitória e você pode continuar jogando.
+- **Espionagem**: névoa de guerra (cidades longe mostram "?"). Na cidade inimiga, 🕵️ Espionagem: revelar tropas da região, sabotar ou incitar revolta. Se o espião for pego, a relação piora.
+- **Batalhas com som** (WebAudio, muda conforme a era) e rajadas de tiros no mapa. Botão de som no Menu.
+- **Medalhas** (18), sem ranking.
+- **Partida rápida**: só um continente, tempo 2× e meta de 45% das cidades.
+- **Protetorados/vassalos**: proponha com oferta em dinheiro e veja a chance de aceitar. O protetorado paga 25% da renda, entra nas suas guerras e pode se rebelar. A IA também faz, e países pequenos em apuros pedem a sua proteção.
+- O Menu ganhou atalhos (Objetivo, Generais, Cartas, Medalhas, Som, Economia) e o ranking foi removido.

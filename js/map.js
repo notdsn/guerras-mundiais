@@ -4,7 +4,7 @@ const MAPA={};
 (function(){
 const WW=GEO.W,WH=GEO.H;let cv,ctx,dpr=1,VW=0,VH=0;const cam={x:1900,y:500,z:1};MAPA.cam=cam;
 let base=null,baseEra=-1;const BS=Math.min(0.8,4096/WW);
-let provPath=[],coastPath,edgesPath,borderPath,fogPath,ownerPaths={},labels=[],playerPath=null;
+let inativoPath=null,provPath=[],coastPath,edgesPath,borderPath,fogPath,ownerPaths={},labels=[],playerPath=null;
 let sujoDono=true,sujoFog=true;MAPA.sujar=()=>{sujoDono=true;sujoFog=true};MAPA.sujarFog=()=>{sujoFog=true};
 const fx=[];MAPA.fx=fx;let hits=[];let tempo=0;
 const dec=a=>{const o=[];let x=0,y=0;for(let i=0;i<a.length;i+=2){x+=a[i];y+=a[i+1];o.push([x/2,y/2])}return o};
@@ -68,7 +68,7 @@ MAPA.base=()=>base;
 // ---------- caminhos dinâmicos
 function refazerDonos(){const S=SIM.get();ownerPaths={};for(let i=0;i<SIM.NP;i++){const d=S.prov[i].d;(ownerPaths[d]=ownerPaths[d]||new Path2D()).addPath(provPath[i])}
  borderPath=new Path2D();for(const e of SIM.E){if(S.prov[e.a].d===S.prov[e.b].d)continue;const l=e.pts;borderPath.moveTo(l[0][0],l[0][1]);for(let i=1;i<l.length;i++)borderPath.lineTo(l[i][0],l[i][1])}
- playerPath=ownerPaths[S.jog]||null;
+ playerPath=ownerPaths[S.jog]||null;inativoPath=null;if(S.cont){inativoPath=new Path2D();for(let i=0;i<SIM.NP;i++)if(!SIM.provAtiva(i))inativoPath.addPath(provPath[i])}
  // rótulos: componentes conexas por dono
  labels=[];const vis=new Uint8Array(SIM.NP);for(let i=0;i<SIM.NP;i++){if(vis[i])continue;const d=S.prov[i].d;const comp=[];const st=[i];vis[i]=1;while(st.length){const p=st.pop();comp.push(p);for(const q of SIM.P[p].a)if(!vis[q]&&S.prov[q].d===d){vis[q]=1;st.push(q)}}
   let area=0,sx=0,sy=0,x0=1e9,x1=-1e9;for(const p of comp){const b=SIM.P[p].bb;const a=(b[2]-b[0])*(b[3]-b[1]);area+=a;sx+=SIM.P[p].x*a;sy+=SIM.P[p].y*a;x0=Math.min(x0,b[0]);x1=Math.max(x1,b[2])}
@@ -85,6 +85,7 @@ MAPA.onda=(x,y,cor)=>fx.push({t:'onda',x,y,cor,v:0,dur:1.4});
 MAPA.texto=(x,y,txt,cor)=>fx.push({t:'txt',x,y,txt,cor,v:0,dur:1.6});
 // marcha: soldados/tanques/aviões indo de (x0,y0) até (x1,y1)
 MAPA.marcha=(x0,y0,x1,y1,tipo,era,dur=1.5,cor='#fff')=>fx.push({t:'mar',x0,y0,x1,y1,tipo,era,v:0,dur,cor});
+MAPA.tiros=(x0,y0,x1,y1,era,dur=1.4)=>fx.push({t:'tir',x0,y0,x1,y1,era,v:0,dur});
 let tremor=0;MAPA.tremer=v=>{tremor=Math.max(tremor,v)};
 // ---------- desenho
 const W2S=(x,y)=>[(x-cam.x)*cam.z,(y-cam.y)*cam.z];MAPA.W2S=W2S;
@@ -103,6 +104,7 @@ MAPA.desenhar=(dt)=>{const S=SIM.get();if(!S||!ctx)return;tempo+=dt;
  ctx.lineJoin='round';ctx.strokeStyle=T.prov;ctx.lineWidth=.8/z;ctx.stroke(edgesPath);
  ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=3.2/z;ctx.stroke(borderPath);ctx.strokeStyle=T.borda;ctx.lineWidth=1.3/z;ctx.globalAlpha=eraV>=2?.85:.7;ctx.stroke(borderPath);ctx.globalAlpha=1;
  if(playerPath){ctx.strokeStyle='#ffe9a0';ctx.lineWidth=1.6/z;ctx.globalAlpha=.9;ctx.save();ctx.clip(playerPath);ctx.stroke(borderPath);ctx.restore();ctx.globalAlpha=1}
+ if(inativoPath){ctx.fillStyle='rgba(6,9,14,.62)';ctx.fill(inativoPath)}
  // rotas marítimas
  if(MAPA.selProv!=null){const sp=MAPA.selProv;ctx.save();ctx.setLineDash([6/z,5/z]);ctx.lineWidth=1.6/z;ctx.strokeStyle=eraV>=2?'rgba(140,220,255,.6)':'rgba(255,250,230,.65)';ctx.beginPath();for(const [a,b] of SIM.LIG){if(a!==sp&&b!==sp)continue;const A=SIM.P[a],B=SIM.P[b];if(Math.abs(A.x-B.x)>1500)continue;ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y)}ctx.stroke();ctx.restore()}
  const pulso=.5+.5*Math.sin(tempo*5);
@@ -123,7 +125,7 @@ MAPA.desenhar=(dt)=>{const S=SIM.get();if(!S||!ctx)return;tempo+=dt;
  // marcadores de cidade
  hits=[];const r=Math.max(9,Math.min(16,7+z*3));const cel=r*2+(z<1.4?16:z<2.4?9:5);const occ=new Set();
  const alvos=new Set(MAPA.alvos||[]),moveis=new Set(MAPA.moveis||[]);const lista=[];
- for(const p of SIM.P){if(!naTela(p.x,p.y))continue;const pr=S.prov[p.id];const n=S.nac[pr.d];const cap=n&&n.cap===p.id;const meu=pr.d===S.jog;const tot=pr.i+pr.b+pr.a;
+ for(const p of SIM.P){if(!naTela(p.x,p.y))continue;if(S.cont&&!SIM.provAtiva(p.id))continue;const pr=S.prov[p.id];const n=S.nac[pr.d];const cap=n&&n.cap===p.id;const meu=pr.d===S.jog;const tot=pr.i+pr.b+pr.a;
   let pri=tot+(p.pop/400);if(meu)pri+=1e4;if(cap)pri+=5e3;if(alvos.has(p.id)||moveis.has(p.id))pri+=1e6;if(p.id===MAPA.selProv||p.id===MAPA.missao)pri+=1e7;
   if(z<.75&&!cap&&pri<1e6&&!(meu&&z>.5))continue;lista.push({p,pr,n,cap,meu,tot,pri})}
  lista.sort((a,b)=>b.pri-a.pri);
@@ -149,6 +151,10 @@ MAPA.desenhar=(dt)=>{const S=SIM.get();if(!S||!ctx)return;tempo+=dt;
    for(let j=(aer?0:2);j>=0;j--){const ox=-Math.cos(ang)*j*22-Math.sin(ang)*(j%2?10:-10)*(j?1:0),oy=-Math.sin(ang)*j*22+Math.cos(ang)*(j%2?10:-10)*(j?1:0);const bob=aer?0:Math.abs(Math.sin(tempo*12+j))*-3;
     if(!aer&&Math.random()<dt*14)fx.push({t:'poe',x:x+(ox/z)+(Math.random()-.5)*4/z,y:y+(oy/z)+6/z,v:0,dur:.7});
     if(im&&im.complete&&im.naturalWidth){const w=W0,h=w*im.naturalHeight/im.naturalWidth;ctx.save();ctx.translate(sx+ox,sy+oy+bob);if(esq)ctx.scale(-1,1);if(aer)ctx.rotate((esq?-1:1)*Math.max(-.4,Math.min(.4,Math.cos(e*Math.PI)*-.5)));ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=8;ctx.shadowOffsetY=aer?14:3;ctx.drawImage(im,-w/2,-h*.8,w,h);ctx.restore()}}}
+  else if(f.t==='tir'){const rate=f.era>=1?34:16;if(q<.92&&Math.random()<dt*rate){const j=()=>(Math.random()-.5)*10;const rv=Math.random()<.35;fx.push({t:'bal',x0:(rv?f.x1:f.x0)+j(),y0:(rv?f.y1:f.y0)+j(),x1:(rv?f.x0:f.x1)+j(),y1:(rv?f.y0:f.y1)+j(),era:f.era,v:0,dur:.22+Math.random()*.12})}}
+  else if(f.t==='bal'){const a=Math.max(0,q-.25),b=Math.min(1,q+.05);const [ax,ay]=W2S(f.x0+(f.x1-f.x0)*a,f.y0+(f.y1-f.y0)*a);const [bx,by]=W2S(f.x0+(f.x1-f.x0)*b,f.y0+(f.y1-f.y0)*b);const c=f.era>=2?'130,255,160':'255,214,120';
+   ctx.save();ctx.shadowColor=`rgb(${c})`;ctx.shadowBlur=6;ctx.strokeStyle=`rgba(${c},${.95*(1-q*.6)})`;ctx.lineWidth=1.7;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();ctx.restore();
+   if(q<.25){const [mx,my]=W2S(f.x0,f.y0);ctx.fillStyle=`rgba(255,240,190,${1-q*4})`;ctx.beginPath();ctx.arc(mx,my,3.2,0,7);ctx.fill()}}
   else if(f.t==='poe'){const [sx,sy]=W2S(f.x,f.y);ctx.fillStyle=`rgba(170,150,120,${.35*(1-q)})`;ctx.beginPath();ctx.arc(sx,sy,3+q*7,0,7);ctx.fill()}}
 };
 function marcador(it,sx,sy,r,eraV,alvos,moveis,pulso,S){const z=cam.z;const n=it.n;const cor=n?corEra(n.cor,3):'#888';const [R,G,B]=hexRgb(n?n.cor:'#888888');const id=it.p.id;
@@ -160,10 +166,11 @@ function marcador(it,sx,sy,r,eraV,alvos,moveis,pulso,S){const z=cam.z;const n=it
  ctx.beginPath();ctx.arc(sx,sy,r,0,7);ctx.fillStyle=g;ctx.fill();ctx.shadowColor='transparent';
  ctx.lineWidth=it.meu?2.4:1.4;ctx.strokeStyle=sel?'#ffd34d':it.meu?'#ffffff':alvo?'#ff4a3a':inimigo?'#ff8a7a':'rgba(10,12,16,.55)';ctx.stroke();
  // número de tropas
- const t=it.tot>=1e4?(it.tot/1e3|0)+'k':it.tot>=1e3?(it.tot/1e3).toFixed(1)+'k':String(it.tot);const fs=t.length>=4?r*.78:t.length===3?r*.92:r*1.08;
+ const oculto=S.jog!=='__demo'&&!it.meu&&!SIM.visivel(id);const t=oculto?'?':it.tot>=1e4?(it.tot/1e3|0)+'k':it.tot>=1e3?(it.tot/1e3).toFixed(1)+'k':String(it.tot);const fs=t.length>=4?r*.78:t.length===3?r*.92:r*1.08;
  ctx.font=`800 ${(fs*.92).toFixed(1)}px Inter, system-ui, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=2.4;ctx.strokeStyle='rgba(0,0,0,.35)';ctx.strokeText(t,sx,sy+.5);ctx.fillStyle='#fff';ctx.fillText(t,sx,sy+.5);
  // capital / fortaleza
  if(it.cap)estrela(sx-r*.75,sy-r*.8,r*.5,eraV);
+ if(SIM.genEm&&(it.meu||!oculto)&&SIM.genEm(id)){ctx.lineWidth=1.8;ctx.strokeStyle='#ffd34d';ctx.beginPath();ctx.arc(sx,sy,r+3,0,7);ctx.stroke();ctx.fillStyle='#ffd34d';ctx.beginPath();ctx.arc(sx+r*.8,sy+r*.75,r*.28,0,7);ctx.fill();ctx.strokeStyle='#3a2600';ctx.lineWidth=1;ctx.stroke()}
  if(it.pr.fort&&(z>2.8||sel)){ctx.fillStyle='#2b2b2b';ctx.strokeStyle='#e9d9a6';ctx.lineWidth=1.2;const x=sx+r*.72,y=sy-r*.78,s=r*.42;ctx.beginPath();ctx.moveTo(x-s,y-s);ctx.lineTo(x+s,y-s);ctx.lineTo(x+s,y+s*.2);ctx.quadraticCurveTo(x,y+s*1.4,x-s,y+s*.2);ctx.closePath();ctx.fill();ctx.stroke()}
  ctx.restore()}
 function estrela(x,y,r,e){ctx.save();ctx.translate(x,y);ctx.beginPath();for(let i=0;i<10;i++){const rr=i%2?r*.45:r;const an=-Math.PI/2+i*Math.PI/5;ctx.lineTo(Math.cos(an)*rr,Math.sin(an)*rr)}ctx.closePath();ctx.fillStyle='#ffd34d';ctx.fill();ctx.strokeStyle='#3a2600';ctx.lineWidth=1.3;ctx.stroke();ctx.restore()}
